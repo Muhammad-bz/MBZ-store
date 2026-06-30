@@ -156,11 +156,8 @@ function MovingFigure({ progress }) {
   );
 }
 
-/* A video whose playback position is driven directly by scroll progress
-   (0..1) instead of autoplaying — scrolling literally scrubs through the
-   footage frame by frame, so it reads as "moving through" the clip rather
-   than a video just playing in the background. */
-function ScrollScrubVideo({ src, progress, className }) {
+/* Video scrubbed by scroll progress — playback position = scroll position */
+function ScrollScrubVideo({ src, progress }) {
   const videoRef = useRef(null);
   const [duration, setDuration] = useState(0);
 
@@ -168,7 +165,6 @@ function ScrollScrubVideo({ src, progress, className }) {
     const v = videoRef.current;
     if (v && duration) {
       const t = Math.min(duration - 0.04, Math.max(0, progress * duration));
-      // avoid spamming currentTime writes with near-identical values
       if (Math.abs(v.currentTime - t) > 0.02) v.currentTime = t;
     }
   }, [progress, duration]);
@@ -181,7 +177,7 @@ function ScrollScrubVideo({ src, progress, className }) {
       playsInline
       preload="auto"
       onLoadedMetadata={(e) => setDuration(e.target.duration)}
-      className={className}
+      className="absolute inset-0 w-full h-full object-cover"
     />
   );
 }
@@ -209,112 +205,136 @@ function CinematicHero({ onNav }) {
     };
   }, []);
 
+  // Scene 0 = video fullscreen (0% → 33% scroll)
+  // Scene 1 = "Made to keep up" with figure (33% → 66%)
+  // Scene 2 = "Wear the new season" with CTA (66% → 100%)
   const sceneFloat = progress * (SCENES.length - 1);
   const sceneIndex = Math.min(SCENES.length - 1, Math.round(sceneFloat));
   const scene = SCENES[sceneIndex];
 
-  // crossfade text between scenes based on closeness to nearest integer
   const distFromCenter = Math.abs(sceneFloat - sceneIndex);
   const textOpacity = 1 - Math.min(1, distFromCenter * 3.2);
   const textShift = distFromCenter * 24;
 
-  // The opening "fall" plays out across the first ~45% of the hero's
-  // scroll distance, fading away as scene two begins.
-  const rackWindow = 0.45;
-  const rackProgress = Math.min(1, progress / rackWindow);
-  const rackOpacity = 1 - Math.min(1, Math.max(0, (progress - rackWindow) / 0.15));
+  // Video fades out across first 33% of scroll (scene 0 → scene 1 transition)
+  const videoOpacity = Math.max(0, 1 - sceneFloat * 3);
+  // Video scrub only plays during scene 0
+  const videoProgress = Math.min(1, sceneFloat);
+  // Figure fades in once video is gone
+  const figureOpacity = Math.min(1, Math.max(0, (sceneFloat - 0.6) * 3));
 
   return (
-    <div ref={containerRef} style={{ height: "330vh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "400vh", position: "relative" }}>
       <div
-        className="sticky top-0 h-screen overflow-hidden flex items-center"
+        className="sticky top-0 h-screen overflow-hidden"
         style={{ background: `linear-gradient(180deg, ${C.bgSoft} 0%, ${C.bg} 100%)`, fontFamily: FONT_BODY }}
       >
-        <div className="absolute top-0 left-0 w-full h-[6px] z-20" style={{ background: ACCENT_BAR }} />
+        {/* ACCENT BAR */}
+        <div className="absolute top-0 left-0 w-full h-[6px] z-30" style={{ background: ACCENT_BAR }} />
 
-        {/* Opening scene visual: the real photo, fully visible, falling/tilting
-            away as you scroll past it — then the figure takes over for the
-            later scenes. No fabricated garment art, just the actual image. */}
-        <div className="relative max-w-7xl mx-auto px-5 sm:px-8 w-full grid lg:grid-cols-2 items-center gap-8">
-          {/* Animated text block */}
-          <div style={{ opacity: textOpacity, transform: `translateY(${textShift}px)`, transition: "opacity 0.08s linear" }}>
-            <p className="text-xs tracking-[0.3em] uppercase mb-4" style={{ color: "#8a6cf0" }}>{scene.tag}</p>
-            <h1 className="text-5xl sm:text-7xl font-black leading-[0.95] max-w-xl" style={{ color: C.maroon }}>
-              {scene.lines.map((line, i) => {
-                const isAccent = sceneIndex === 0 && line === "Motion.";
-                return (
-                  <span
-                    key={i}
-                    className="block"
-                    style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500 } : undefined}
-                  >
-                    {line}
-                  </span>
-                );
-              })}
-            </h1>
-            <p className="mt-5 max-w-md text-sm sm:text-base font-medium" style={{ color: C.inkSoft }}>{scene.sub}</p>
-            {sceneIndex === SCENES.length - 1 && (
-              <div className="mt-8 flex gap-4">
-                <button
-                  onClick={() => onNav("category", "shoes")}
-                  className="px-6 py-3 rounded-full text-sm font-medium transition-transform hover:scale-105 flex items-center gap-2"
-                  style={{ background: C.maroon, color: C.bgSoft }}
-                >
-                  Shop Now <ArrowRight size={16} />
-                </button>
-                <button
-                  onClick={() => onNav("category", "apparel")}
-                  className="px-6 py-3 rounded-full text-sm font-medium border transition-colors"
-                  style={{ borderColor: C.line, color: C.maroon }}
-                >
-                  Explore Apparel
-                </button>
-              </div>
-            )}
-          </div>
+        {/* FULL-SCREEN VIDEO BACKGROUND — fades out as you scroll */}
+        <div
+          className="absolute inset-0 z-0"
+          style={{ opacity: videoOpacity, transition: "opacity 0.05s linear" }}
+        >
+          <ScrollScrubVideo src="/cloth-falling.mp4" progress={videoProgress} />
+          {/* dark gradient overlay so text is always readable on top */}
+          <div className="absolute inset-0" style={{
+            background: "linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)"
+          }} />
+        </div>
 
-          {/* Visual panel: scroll scrubs through the cloth-falling footage,
-              then the figure fades in once the clip has played through.
-              Visible on every screen size now, sized down on mobile. */}
-          <div className="flex justify-center items-center relative mt-10 lg:mt-0 min-h-[300px] sm:min-h-[420px] lg:min-h-[560px]">
+        {/* TEXT — always visible, color changes from white (on video) to maroon (on cream bg) */}
+        <div className="relative z-10 h-full flex items-center">
+          <div className="max-w-7xl mx-auto px-6 sm:px-10 w-full">
             <div
-              className="absolute w-[220px] sm:w-[300px] lg:w-[340px] rounded-2xl overflow-hidden shadow-2xl"
               style={{
-                opacity: rackOpacity,
-                transform: `scale(${1 - rackProgress * 0.06})`,
-                transition: "opacity 0.05s linear",
-                boxShadow: "0 30px 60px rgba(62,26,11,0.35)",
+                opacity: textOpacity,
+                transform: `translateY(${textShift}px)`,
+                transition: "opacity 0.08s linear",
               }}
             >
-              <ScrollScrubVideo
-                src="/cloth-falling.mp4"
-                progress={rackProgress}
-                className="w-full h-auto block"
-              />
-            </div>
-
-            <div className="scale-75 sm:scale-90 lg:scale-100" style={{ opacity: 1 - rackOpacity }}>
-              <div className="absolute w-72 h-72 rounded-full blur-3xl opacity-40" style={{ background: "radial-gradient(circle, #b25cf0, transparent)" }} />
-              <MovingFigure progress={progress} />
+              <p
+                className="text-xs tracking-[0.3em] uppercase mb-4 font-medium"
+                style={{ color: videoOpacity > 0.3 ? "rgba(255,255,255,0.75)" : "#8a6cf0" }}
+              >
+                {scene.tag}
+              </p>
+              <h1
+                className="text-5xl sm:text-7xl font-black leading-[0.9] max-w-xl"
+                style={{ color: videoOpacity > 0.3 ? "#ffffff" : C.maroon }}
+              >
+                {scene.lines.map((line, i) => {
+                  const isAccent = sceneIndex === 0 && line === "Motion.";
+                  return (
+                    <span
+                      key={i}
+                      className="block"
+                      style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500 } : undefined}
+                    >
+                      {line}
+                    </span>
+                  );
+                })}
+              </h1>
+              <p
+                className="mt-5 max-w-md text-sm sm:text-base font-medium"
+                style={{ color: videoOpacity > 0.3 ? "rgba(255,255,255,0.8)" : C.inkSoft }}
+              >
+                {scene.sub}
+              </p>
+              {sceneIndex === SCENES.length - 1 && (
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <button
+                    onClick={() => onNav("category", "shoes")}
+                    className="px-6 py-3 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105"
+                    style={{ background: C.maroon, color: C.bgSoft }}
+                  >
+                    Shop Now <ArrowRight size={16} />
+                  </button>
+                  <button
+                    onClick={() => onNav("category", "apparel")}
+                    className="px-6 py-3 rounded-full text-sm font-medium border transition-colors"
+                    style={{ borderColor: C.line, color: C.maroon }}
+                  >
+                    Explore Apparel
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs tracking-widest uppercase" style={{ color: C.inkSoft, opacity: 0.6 }}>
+        {/* ANIMATED FIGURE — fades in after video fades out, stays for scenes 1 & 2 */}
+        <div
+          className="absolute right-8 sm:right-16 top-1/2 -translate-y-1/2 z-10 hidden sm:block"
+          style={{ opacity: figureOpacity, transition: "opacity 0.05s linear" }}
+        >
+          <div className="absolute w-72 h-72 rounded-full blur-3xl opacity-30"
+            style={{ background: "radial-gradient(circle, #b25cf0, transparent)", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }} />
+          <MovingFigure progress={progress} />
+        </div>
+
+        {/* SCROLL HINT */}
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs tracking-widest uppercase z-10"
+          style={{ color: videoOpacity > 0.3 ? "rgba(255,255,255,0.6)" : C.inkSoft, opacity: 0.7 }}
+        >
           {sceneIndex < SCENES.length - 1 ? "Keep scrolling" : "Scroll to browse"}
         </div>
 
-        {/* scene progress dots */}
-        <div className="absolute right-6 sm:right-10 top-1/2 -translate-y-1/2 flex flex-col gap-3">
+        {/* SCENE DOTS */}
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
           {SCENES.map((_, i) => (
             <div
               key={i}
-              className="w-2 h-2 rounded-full transition-all"
+              className="w-2 h-2 rounded-full transition-all duration-300"
               style={{
-                background: i === sceneIndex ? C.maroon : "transparent",
-                border: `1.5px solid ${C.maroon}`,
-                opacity: i === sceneIndex ? 1 : 0.35,
+                background: i === sceneIndex
+                  ? (videoOpacity > 0.3 ? "#fff" : C.maroon)
+                  : "transparent",
+                border: `1.5px solid ${videoOpacity > 0.3 ? "#fff" : C.maroon}`,
+                opacity: i === sceneIndex ? 1 : 0.4,
               }}
             />
           ))}
