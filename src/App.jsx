@@ -216,12 +216,12 @@ function CinematicHero({ onNav }) {
   const textOpacity = 1 - Math.min(1, distFromCenter * 3.2);
   const textShift = distFromCenter * 24;
 
-  // Video fades out across first 33% of scroll (scene 0 → scene 1 transition)
-  const videoOpacity = Math.max(0, 1 - sceneFloat * 3);
-  // Video scrub only plays during scene 0
+  // Video stays FULLY visible through scene 0, fades out sharply at scene 0→1 transition
+  const videoOpacity = Math.max(0, 1 - Math.max(0, sceneFloat - 0.7) * 5);
+  // Video scrubs through full duration during scene 0 only
   const videoProgress = Math.min(1, sceneFloat);
-  // Figure fades in once video is gone
-  const figureOpacity = Math.min(1, Math.max(0, (sceneFloat - 0.6) * 3));
+  // Figure only appears after video is fully gone
+  const figureOpacity = Math.min(1, Math.max(0, (sceneFloat - 1.0) * 4));
 
   return (
     <div ref={containerRef} style={{ height: "400vh", position: "relative" }}>
