@@ -156,6 +156,36 @@ function MovingFigure({ progress }) {
   );
 }
 
+/* A video whose playback position is driven directly by scroll progress
+   (0..1) instead of autoplaying — scrolling literally scrubs through the
+   footage frame by frame, so it reads as "moving through" the clip rather
+   than a video just playing in the background. */
+function ScrollScrubVideo({ src, progress, className }) {
+  const videoRef = useRef(null);
+  const [duration, setDuration] = useState(0);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (v && duration) {
+      const t = Math.min(duration - 0.04, Math.max(0, progress * duration));
+      // avoid spamming currentTime writes with near-identical values
+      if (Math.abs(v.currentTime - t) > 0.02) v.currentTime = t;
+    }
+  }, [progress, duration]);
+
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      muted
+      playsInline
+      preload="auto"
+      onLoadedMetadata={(e) => setDuration(e.target.duration)}
+      className={className}
+    />
+  );
+}
+
 function CinematicHero({ onNav }) {
   const containerRef = useRef(null);
   const [progress, setProgress] = useState(0);
@@ -244,25 +274,27 @@ function CinematicHero({ onNav }) {
             )}
           </div>
 
-          {/* Right column: real photo falls/tilts away, then the figure fades in */}
-          <div className="hidden lg:flex justify-center items-center relative" style={{ minHeight: 560 }}>
+          {/* Visual panel: scroll scrubs through the cloth-falling footage,
+              then the figure fades in once the clip has played through.
+              Visible on every screen size now, sized down on mobile. */}
+          <div className="flex justify-center items-center relative mt-10 lg:mt-0 min-h-[300px] sm:min-h-[420px] lg:min-h-[560px]">
             <div
-              className="absolute w-[340px] rounded-2xl overflow-hidden shadow-2xl"
+              className="absolute w-[220px] sm:w-[300px] lg:w-[340px] rounded-2xl overflow-hidden shadow-2xl"
               style={{
                 opacity: rackOpacity,
-                transform: `translateY(${rackProgress * 480}px) rotate(${rackProgress * 14}deg) scale(${1 - rackProgress * 0.08})`,
-                transition: "transform 0.05s linear, opacity 0.05s linear",
+                transform: `scale(${1 - rackProgress * 0.06})`,
+                transition: "opacity 0.05s linear",
                 boxShadow: "0 30px 60px rgba(62,26,11,0.35)",
               }}
             >
-              <img
-                src="https://i.postimg.cc/Dy5LHJR0/Generated-Image-June-30-2026-8-29AM.png"
-                alt="MBZ apparel hanging on a wooden rail"
+              <ScrollScrubVideo
+                src="/cloth-falling.mp4"
+                progress={rackProgress}
                 className="w-full h-auto block"
               />
             </div>
 
-            <div style={{ opacity: 1 - rackOpacity }}>
+            <div className="scale-75 sm:scale-90 lg:scale-100" style={{ opacity: 1 - rackOpacity }}>
               <div className="absolute w-72 h-72 rounded-full blur-3xl opacity-40" style={{ background: "radial-gradient(circle, #b25cf0, transparent)" }} />
               <MovingFigure progress={progress} />
             </div>
