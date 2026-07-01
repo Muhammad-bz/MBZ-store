@@ -27,6 +27,7 @@ function GlobalFonts() {
       @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&family=Plus+Jakarta+Sans:wght@500;700;800;900&display=swap');
       @keyframes storeSweep { 0% { transform: translateX(-15%); } 100% { transform: translateX(15%); } }
       @keyframes rackHang { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+      @keyframes spin { to { transform: rotate(360deg); } }
     `}</style>
   );
 }
@@ -188,6 +189,7 @@ function CinematicHero({ onNav }) {
   const rafId         = useRef(null);
   const progressRef   = useRef(0);
   const lastSceneRef  = useRef(-1);
+  const loadingRef    = useRef(null);
 
   // poses: [x, y, rot, arm, leg, scale]
   const poses = [
@@ -195,6 +197,53 @@ function CinematicHero({ onNav }) {
     { x: 4,   y: -14, rot: 4,  arm: -22, leg: -16, scale: 1.05 },
     { x: 0,   y: -4,  rot: 0,  arm: 6,   leg: 2,   scale: 1.12 },
   ];
+
+  // ── Fetch video as blob so Chrome can seek regardless of server headers ──
+  // GitHub raw / many Vercel configs don't send Accept-Ranges, which means
+  // the browser refuses random-access seeks and stays frozen on frame 0.
+  // A fully-downloaded blob: URL is always seekable.
+  const blobUrlRef   = useRef(null);
+  const videoReadyRef = useRef(false); // true once blob is assigned + canplay fired
+
+  useEffect(() => {
+    let revoked = false;
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Show a loading overlay while fetching
+    if (loadingRef.current) loadingRef.current.style.display = "flex";
+
+    fetch("/cloth-falling.mp4")
+      .then((r) => {
+        if (!r.ok) throw new Error("fetch failed");
+        return r.blob();
+      })
+      .then((blob) => {
+        if (revoked) return;
+        const url = URL.createObjectURL(blob);
+        blobUrlRef.current = url;
+        video.src = url;
+        video.load();
+      })
+      .catch(() => {
+        // fallback: just use the original src and hope for the best
+        video.src = "/cloth-falling.mp4";
+        video.load();
+      });
+
+    const onCanPlay = () => {
+      videoReadyRef.current = true;
+      videoDuration.current = video.duration;
+      if (loadingRef.current) loadingRef.current.style.display = "none";
+    };
+    video.addEventListener("canplaythrough", onCanPlay);
+
+    return () => {
+      revoked = true;
+      video.removeEventListener("canplaythrough", onCanPlay);
+      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
+    };
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // rAF loop: reads progressRef, writes DOM
   useEffect(() => {
@@ -204,10 +253,10 @@ function CinematicHero({ onNav }) {
       rafId.current = requestAnimationFrame(tick);
       const p = progressRef.current;
 
-      // video scrub
+      // video scrub — only seek once the blob is loaded and seekable
       const video = videoRef.current;
       const dur   = videoDuration.current;
-      if (video && dur > 0) {
+      if (video && dur > 0 && videoReadyRef.current) {
         const target = Math.min(dur - 0.04, Math.max(0, p * dur));
         if (Math.abs(video.currentTime - target) > 0.016) {
           video.currentTime = target;
@@ -310,12 +359,27 @@ function CinematicHero({ onNav }) {
             muted
             playsInline
             preload="auto"
-            onLoadedMetadata={(e) => { videoDuration.current = e.target.duration; }}
             className="absolute inset-0 w-full h-full object-cover"
           />
           <div className="absolute inset-0" style={{
             background: "linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)"
           }} />
+          {/* Loading indicator — shown while video blob is being fetched */}
+          <div
+            ref={loadingRef}
+            className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20"
+            style={{ background: "rgba(0,0,0,0.7)", display: "flex" }}
+          >
+            <div style={{
+              width: 40, height: 40, borderRadius: "50%",
+              border: "3px solid rgba(255,255,255,0.15)",
+              borderTopColor: "#b25cf0",
+              animation: "spin 0.8s linear infinite",
+            }} />
+            <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, letterSpacing: "0.15em" }}>
+              LOADING VIDEO
+            </p>
+          </div>
         </div>
 
         {/* TEXT SCENES — pre-rendered, toggled via display not remount */}
