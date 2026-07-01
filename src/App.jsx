@@ -178,9 +178,9 @@ function MovingFigure({ progress }) {
 //   Cloudinary free tier has generous transformation limits.
 
 const CLOUDINARY_BASE = "https://res.cloudinary.com/leu4dssl/video/upload";
-const CLOUDINARY_ID   = "v1782902573/VID_20260701_152905_gwzkga";
-const VIDEO_DURATION  = 4;    // video is 4 seconds
-const FRAME_COUNT     = 60;   // 60 frames across 4s = smooth
+const CLOUDINARY_ID   = "v1782906874/lv_0_20260701165054_v4aozt";
+const VIDEO_DURATION  = 6;    // adjust if your video is longer/shorter
+const FRAME_COUNT     = 90;   // more frames = smoother blending
 
 const FRAME_PATH = (n) => {
   // n is 0-indexed; spread frames evenly across the video duration
@@ -188,7 +188,8 @@ const FRAME_PATH = (n) => {
   // w_1280: serve at 1280px wide (crisp on mobile retina, reasonable file size)
   // q_auto:best: Cloudinary picks optimal quality
   // c_fill,g_auto: crop to fill, smart gravity
-  return `${CLOUDINARY_BASE}/w_1280,q_auto:best,c_fill,g_auto/so_${t}/${CLOUDINARY_ID}.jpg`;
+  // ar_9:16 + c_fill ensures proper crop for portrait video on all screens
+  return `${CLOUDINARY_BASE}/w_1080,h_1920,c_fill,g_auto,q_auto:best/so_${t}/${CLOUDINARY_ID}.jpg`;
 };
 
 /* Preload all frames and report progress */
@@ -281,7 +282,18 @@ function CinematicHero({ onNav }) {
         const frameIndex = Math.min(frames.length - 1,
           Math.floor(videoScrubProgress * frames.length));
         const ctx = canvas.getContext("2d");
-        drawImageCover(ctx, frames[frameIndex], cw, ch);
+        // Draw current frame — for smoother blending between frames,
+        // paint previous frame first then overlay current at full opacity.
+        // This removes the "jump" between frames caused by integer rounding.
+        const prevIndex = Math.max(0, frameIndex - 1);
+        if (prevIndex !== frameIndex && frames[prevIndex]?.naturalWidth) {
+          drawImageCover(ctx, frames[prevIndex], cw, ch);
+          ctx.globalAlpha = Math.min(1, (videoScrubProgress * frames.length) % 1 + 0.5);
+          drawImageCover(ctx, frames[frameIndex], cw, ch);
+          ctx.globalAlpha = 1;
+        } else {
+          drawImageCover(ctx, frames[frameIndex], cw, ch);
+        }
 
         // canvas opacity: full during scrub, fade after
         const canvasOpacity = p < VIDEO_END
@@ -383,7 +395,7 @@ function CinematicHero({ onNav }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ height: "500vh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "300vh", position: "relative" }}>
       <div
         className="sticky top-0 h-screen overflow-hidden"
         style={{ background: `linear-gradient(180deg, ${C.bgSoft} 0%, ${C.bg} 100%)`, fontFamily: FONT_BODY }}
