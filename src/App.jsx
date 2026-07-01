@@ -178,9 +178,9 @@ function MovingFigure({ progress }) {
 //   Cloudinary free tier has generous transformation limits.
 
 const CLOUDINARY_BASE = "https://res.cloudinary.com/leu4dssl/video/upload";
-const CLOUDINARY_ID   = "v1782868122/cloth-falling2_nh3mwx";
-const VIDEO_DURATION  = 6;    // ← seconds long your video is (adjust if needed)
-const FRAME_COUNT     = 60;   // ← smoothness (60 is great, 90 is silky)
+const CLOUDINARY_ID   = "v1782902573/VID_20260701_152905_gwzkga";
+const VIDEO_DURATION  = 4;    // video is 4 seconds
+const FRAME_COUNT     = 60;   // 60 frames across 4s = smooth
 
 const FRAME_PATH = (n) => {
   // n is 0-indexed; spread frames evenly across the video duration
@@ -258,8 +258,8 @@ function CinematicHero({ onNav }) {
 
   // ── rAF loop ───────────────────────────────────────────────────────
   useEffect(() => {
-    const VIDEO_END      = 0.45; // 0→0.45 = frame scrub
-    const VIDEO_FADE_END = 0.62; // 0.45→0.62 = canvas fades out
+    const VIDEO_END      = 0.85; // scrub video for first 85% of scroll
+    const VIDEO_FADE_END = 1.00; // canvas stays fully visible — no fade out
 
     const tick = () => {
       rafRef.current = requestAnimationFrame(tick);
@@ -314,11 +314,11 @@ function CinematicHero({ onNav }) {
         if (paths[5]) paths[5].setAttribute("d", `M112,172 L${112 + leg * 1.4},230 L${112 + leg * 1.1},300`);
       }
 
-      const figureOpacity = Math.min(1, Math.max(0, (p - VIDEO_FADE_END) / 0.1));
+      const figureOpacity = Math.min(1, Math.max(0, (p - 0.90) / 0.1));
       if (figWrapRef.current) figWrapRef.current.style.opacity = figureOpacity;
 
       // ── text scenes ──────────────────────────────────────────────
-      const onVideo = p < VIDEO_FADE_END;
+      const onVideo = true; // video always visible underneath
       const textColor    = onVideo ? "#ffffff" : C.maroon;
       const subColor     = onVideo ? "rgba(255,255,255,0.8)" : C.inkSoft;
       const tagColor     = onVideo ? "rgba(255,255,255,0.75)" : "#8a6cf0";
@@ -341,10 +341,11 @@ function CinematicHero({ onNav }) {
       }
 
       // per-frame text transition
-      const textProgress = p < VIDEO_END * 0.85 ? 0 : sceneProgress;
+      // Text hidden during video scrub, fades in when clothes hit the ground (~85%+)
+      const textVisible = Math.min(1, Math.max(0, (p - 0.82) / 0.08));
       const dist  = Math.abs(sceneFloat - sceneIndex);
-      const tOp   = p < VIDEO_END * 0.85 ? 1 : 1 - Math.min(1, dist * 3.2);
-      const tShift = p < VIDEO_END * 0.85 ? 0 : dist * 24;
+      const tOp   = textVisible * (1 - Math.min(1, dist * 3.2));
+      const tShift = (1 - textVisible) * 40 + dist * 24;
       const activeWrap = textWrapsRef.current[sceneIndex];
       if (activeWrap) {
         activeWrap.style.opacity   = tOp;
