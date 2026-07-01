@@ -156,144 +156,223 @@ function MovingFigure({ progress }) {
   );
 }
 
-/* Canvas-based scroll scrub — the video element is hidden and only used
-   as a frame source. On every seek we draw that frame to a <canvas>,
-   which is what the user actually sees. This bypasses Android Chrome's
-   "video keeps autoplaying" problem and gives reliable per-frame control.
-   
-   IMPORTANT: for the smoothest possible result on mobile, the ideal
-   upgrade is an image sequence (60-120 JPEGs extracted from the video)
-   — that's what Apple and premium Awwwards sites actually use. This
-   canvas approach is the best we can do with a raw video file. */
-function ScrollScrubVideo({ src, progress }) {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const meta = useRef({ ready: false, duration: 0 });
+/* ============================================================
+   CANVAS FRAME-SEQUENCE SCROLL SCRUB (Cloudinary edition)
+   ============================================================
+   Cloudinary serves each frame as a JPEG on-the-fly using the
+   so_ (start offset) URL parameter — no ffmpeg, no terminal,
+   no extra files. The browser preloads all frames as Image
+   objects, then the rAF loop draws the right one to <canvas>
+   on every scroll tick. Instant seeking, works on any CDN.
+   ============================================================ */
 
-  // Draw current video frame to canvas, scaled to cover
-  const drawFrame = useCallback(() => {
-    const v = videoRef.current;
-    const c = canvasRef.current;
-    if (!v || !c || !v.videoWidth) return;
-    const ctx = c.getContext("2d");
-    const cw = c.offsetWidth, ch = c.offsetHeight;
-    if (c.width !== cw) c.width = cw;
-    if (c.height !== ch) c.height = ch;
-    // object-fit: cover math
-    const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
-    const dx = (cw - v.videoWidth * scale) / 2;
-    const dy = (ch - v.videoHeight * scale) / 2;
-    ctx.drawImage(v, dx, dy, v.videoWidth * scale, v.videoHeight * scale);
-  }, []);
+// ── Cloudinary frame extraction ──────────────────────────────────────
+// Cloudinary generates JPEG screenshots on-the-fly via the `so_` (start offset)
+// parameter — no ffmpeg, no file uploads, no terminal needed.
+// URL format: /video/upload/so_<seconds>/<public_id>.jpg
+//
+// HOW TO RECALIBRATE:
+//   1. Open your video and note its duration in seconds
+//   2. Set VIDEO_DURATION to that value
+//   3. FRAME_COUNT controls smoothness (60 = good, 90 = very smooth)
+//   Cloudinary free tier has generous transformation limits.
 
-  useEffect(() => {
-    const v = videoRef.current;
-    if (!v) return;
+const CLOUDINARY_BASE = "https://res.cloudinary.com/leu4dssl/video/upload";
+const CLOUDINARY_ID   = "v1782868122/cloth-falling2_nh3mwx";
+const VIDEO_DURATION  = 6;    // ← seconds long your video is (adjust if needed)
+const FRAME_COUNT     = 60;   // ← smoothness (60 is great, 90 is silky)
 
-    const onMeta = async () => {
-      meta.current.duration = v.duration;
-      try {
-        // play→pause unlocks Android Chrome's currentTime API
-        await v.play();
-        v.pause();
-        v.currentTime = 0;
-      } catch (_) {}
-      meta.current.ready = true;
-      drawFrame();
+const FRAME_PATH = (n) => {
+  // n is 0-indexed; spread frames evenly across the video duration
+  const t = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(2);
+  return `${CLOUDINARY_BASE}/so_${t}/${CLOUDINARY_ID}.jpg`;
+};
+
+/* Preload all frames and report progress */
+function preloadFrames(onProgress) {
+  return new Promise((resolve) => {
+    const images = new Array(FRAME_COUNT);
+    let loaded = 0;
+
+    const done = () => {
+      loaded++;
+      onProgress(loaded / FRAME_COUNT);
+      if (loaded === FRAME_COUNT) resolve(images);
     };
 
-    v.addEventListener("loadedmetadata", onMeta);
-    v.addEventListener("seeked", drawFrame);
-    return () => {
-      v.removeEventListener("loadedmetadata", onMeta);
-      v.removeEventListener("seeked", drawFrame);
-    };
-  }, [drawFrame]);
-
-  // Seek on every scroll tick — canvas updates via the "seeked" event above
-  useEffect(() => {
-    const v = videoRef.current;
-    const { ready, duration } = meta.current;
-    if (!v || !ready || !duration) return;
-    const target = Math.max(0, Math.min(duration - 0.04, progress * duration));
-    if (Math.abs(v.currentTime - target) > 0.016) {
-      v.pause(); // prevent browser from auto-resuming
-      v.currentTime = target;
+    for (let i = 0; i < FRAME_COUNT; i++) {
+      const img = new Image();
+      img.onload  = done;
+      img.onerror = done; // skip missing frames gracefully
+      img.src = FRAME_PATH(i + 1); // frames are 1-indexed from ffmpeg
+      images[i] = img;
     }
-  }, [progress]);
+  });
+}
 
-  return (
-    <div className="absolute inset-0">
-      {/* Video hidden — only used as a pixel source */}
-      <video
-        ref={videoRef}
-        src={src}
-        muted
-        playsInline
-        preload="auto"
-        style={{ display: "none" }}
-      />
-      {/* Canvas shows the frames */}
-      <canvas
-        ref={canvasRef}
-        className="absolute inset-0 w-full h-full"
-      />
-    </div>
-  );
+/* Draw one Image onto a canvas with object-fit:cover math */
+function drawImageCover(ctx, img, cw, ch) {
+  if (!img || !img.naturalWidth) return;
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const scale = Math.max(cw / iw, ch / ih);
+  const dx = (cw - iw * scale) / 2;
+  const dy = (ch - ih * scale) / 2;
+  ctx.drawImage(img, dx, dy, iw * scale, ih * scale);
 }
 
 function CinematicHero({ onNav }) {
-  const containerRef = useRef(null);
-  const [progress, setProgress] = useState(0);
+  const containerRef  = useRef(null);
+  const canvasRef     = useRef(null);
+  const figGroupRef   = useRef(null);
+  const figWrapRef    = useRef(null);
+  const textWrapsRef  = useRef([]);
+  const dotsRef       = useRef([]);
+  const hintRef       = useRef(null);
+  const loadBarRef    = useRef(null);
+  const loadWrapRef   = useRef(null);
 
+  const progressRef   = useRef(0);
+  const lastSceneRef  = useRef(-1);
+  const framesRef     = useRef([]);   // Image[] once loaded
+  const rafRef        = useRef(null);
+
+  const poses = [
+    { x: -8,  y: 0,   rot: -3, arm: 18,  leg: 14,  scale: 1.0  },
+    { x: 4,   y: -14, rot: 4,  arm: -22, leg: -16, scale: 1.05 },
+    { x: 0,   y: -4,  rot: 0,  arm: 6,   leg: 2,   scale: 1.12 },
+  ];
+  const lerp = (a, b, t) => a + (b - a) * t;
+
+  // ── preload frames on mount ────────────────────────────────────────
   useEffect(() => {
-    const handleScroll = () => {
+    preloadFrames((pct) => {
+      if (loadBarRef.current)  loadBarRef.current.style.width  = `${pct * 100}%`;
+      if (loadWrapRef.current && pct >= 1) loadWrapRef.current.style.display = "none";
+    }).then((images) => {
+      framesRef.current = images;
+    });
+  }, []);
+
+  // ── rAF loop ───────────────────────────────────────────────────────
+  useEffect(() => {
+    const VIDEO_END      = 0.45; // 0→0.45 = frame scrub
+    const VIDEO_FADE_END = 0.62; // 0.45→0.62 = canvas fades out
+
+    const tick = () => {
+      rafRef.current = requestAnimationFrame(tick);
+      const p = progressRef.current;
+
+      // ── canvas frame draw ────────────────────────────────────────
+      const canvas = canvasRef.current;
+      const frames = framesRef.current;
+      if (canvas && frames.length > 0) {
+        const cw = canvas.clientWidth, ch = canvas.clientHeight;
+        if (canvas.width !== cw || canvas.height !== ch) {
+          canvas.width = cw; canvas.height = ch;
+        }
+        const videoScrubProgress = Math.min(1, p / VIDEO_END);
+        const frameIndex = Math.min(frames.length - 1,
+          Math.floor(videoScrubProgress * frames.length));
+        const ctx = canvas.getContext("2d");
+        drawImageCover(ctx, frames[frameIndex], cw, ch);
+
+        // canvas opacity: full during scrub, fade after
+        const canvasOpacity = p < VIDEO_END
+          ? 1
+          : Math.max(0, 1 - (p - VIDEO_END) / (VIDEO_FADE_END - VIDEO_END));
+        canvas.style.opacity = canvasOpacity;
+      }
+
+      // ── figure pose ──────────────────────────────────────────────
+      const sceneProgress = Math.max(0, (p - VIDEO_END) / (1 - VIDEO_END));
+      const sceneFloat    = sceneProgress * (SCENES.length - 1);
+      const scene         = Math.min(SCENES.length - 1, Math.floor(sceneFloat));
+      const local         = sceneFloat - scene;
+      const sceneIndex    = Math.min(SCENES.length - 1, Math.round(sceneFloat));
+
+      const a = poses[Math.min(scene, poses.length - 1)];
+      const b = poses[Math.min(scene + 1, poses.length - 1)];
+      const rot   = lerp(a.rot,   b.rot,   local);
+
+      const g = figGroupRef.current;
+      if (g) {
+        g.style.transform = `translate(${lerp(a.x,b.x,local)}px,${lerp(a.y,b.y,local)}px) rotate(${rot}deg) scale(${lerp(a.scale,b.scale,local)})`;
+        const arm = lerp(a.arm, b.arm, local);
+        const leg = lerp(a.leg, b.leg, local);
+        const paths = g.querySelectorAll("path,line");
+        if (paths[0]) paths[0].setAttribute("d", `M100,68 L${100 - rot * 0.3},170`);
+        if (paths[1]) paths[1].setAttribute("d", `M100,95 L${100 - arm * 1.1},150`);
+        if (paths[2]) paths[2].setAttribute("d", `M100,95 L${100 + arm * 1.3},150`);
+        if (paths[4]) paths[4].setAttribute("d", `M88,172 L${88 - leg * 1.4},230 L${88 - leg * 1.1},300`);
+        if (paths[5]) paths[5].setAttribute("d", `M112,172 L${112 + leg * 1.4},230 L${112 + leg * 1.1},300`);
+      }
+
+      const figureOpacity = Math.min(1, Math.max(0, (p - VIDEO_FADE_END) / 0.1));
+      if (figWrapRef.current) figWrapRef.current.style.opacity = figureOpacity;
+
+      // ── text scenes ──────────────────────────────────────────────
+      const onVideo = p < VIDEO_FADE_END;
+      const textColor    = onVideo ? "#ffffff" : C.maroon;
+      const subColor     = onVideo ? "rgba(255,255,255,0.8)" : C.inkSoft;
+      const tagColor     = onVideo ? "rgba(255,255,255,0.75)" : "#8a6cf0";
+
+      if (sceneIndex !== lastSceneRef.current) {
+        lastSceneRef.current = sceneIndex;
+        textWrapsRef.current.forEach((el, i) => {
+          if (el) el.style.display = i === sceneIndex ? "block" : "none";
+        });
+        dotsRef.current.forEach((dot, i) => {
+          if (!dot) return;
+          dot.style.opacity    = i === sceneIndex ? "1" : "0.4";
+          dot.style.background = i === sceneIndex ? (onVideo ? "#fff" : C.maroon) : "transparent";
+          dot.style.borderColor = onVideo ? "#fff" : C.maroon;
+        });
+        if (hintRef.current) {
+          hintRef.current.textContent = sceneIndex < SCENES.length - 1 ? "Keep scrolling" : "Scroll to browse";
+          hintRef.current.style.color = onVideo ? "rgba(255,255,255,0.6)" : C.inkSoft;
+        }
+      }
+
+      // per-frame text transition
+      const textProgress = p < VIDEO_END * 0.85 ? 0 : sceneProgress;
+      const dist  = Math.abs(sceneFloat - sceneIndex);
+      const tOp   = p < VIDEO_END * 0.85 ? 1 : 1 - Math.min(1, dist * 3.2);
+      const tShift = p < VIDEO_END * 0.85 ? 0 : dist * 24;
+      const activeWrap = textWrapsRef.current[sceneIndex];
+      if (activeWrap) {
+        activeWrap.style.opacity   = tOp;
+        activeWrap.style.transform = `translateY(${tShift}px)`;
+        // update text colors
+        const tag = activeWrap.querySelector(".scene-tag");
+        const h1  = activeWrap.querySelector(".scene-h1");
+        const sub = activeWrap.querySelector(".scene-sub");
+        if (tag) tag.style.color = tagColor;
+        if (h1)  h1.style.color  = textColor;
+        if (sub) sub.style.color = subColor;
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── passive scroll listener ────────────────────────────────────────
+  useEffect(() => {
+    const onScroll = () => {
       const el = containerRef.current;
       if (!el) return;
       const rect = el.getBoundingClientRect();
       const total = rect.height - window.innerHeight;
-      const scrolled = -rect.top;
-      const p = total > 0 ? Math.min(1, Math.max(0, scrolled / total)) : 0;
-      setProgress(p);
+      progressRef.current = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0;
     };
-    handleScroll();
-    window.addEventListener("scroll", handleScroll, { passive: true });
-    window.addEventListener("resize", handleScroll);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
     return () => {
-      window.removeEventListener("scroll", handleScroll);
-      window.removeEventListener("resize", handleScroll);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
     };
   }, []);
-
-  // Total scroll split:
-  // 0.00 → 0.45 = video scrub window (user scrolls through footage)
-  // 0.45 → 0.60 = video fades out
-  // 0.40 → 1.00 = 3 cinematic text scenes
-  const VIDEO_END = 0.45;
-  const VIDEO_FADE_END = 0.62;
-
-  // Video scrub: 0→1 across the scrub window
-  const videoScrubProgress = Math.min(1, progress / VIDEO_END);
-  // Video opacity: full during scrub, fades out after
-  const videoOpacity = progress < VIDEO_END
-    ? 1
-    : Math.max(0, 1 - (progress - VIDEO_END) / (VIDEO_FADE_END - VIDEO_END));
-
-  // Cinematic scenes start after the video window
-  const sceneProgress = Math.max(0, (progress - VIDEO_END) / (1 - VIDEO_END));
-  const sceneFloat = sceneProgress * (SCENES.length - 1);
-  const sceneIndex = Math.min(SCENES.length - 1, Math.round(sceneFloat));
-  const scene = SCENES[sceneIndex];
-
-  const distFromCenter = Math.abs(sceneFloat - sceneIndex);
-  const textOpacity = progress < VIDEO_END * 0.85
-    ? 1  // text fully visible on video
-    : 1 - Math.min(1, distFromCenter * 3.2);
-  const textShift = progress < VIDEO_END * 0.85 ? 0 : distFromCenter * 24;
-
-  // Figure fades in only after video is gone
-  const figureOpacity = Math.min(1, Math.max(0, (progress - VIDEO_FADE_END) / 0.1));
-  const onVideo = videoOpacity > 0.3;
 
   return (
     <div ref={containerRef} style={{ height: "500vh", position: "relative" }}>
@@ -304,116 +383,126 @@ function CinematicHero({ onNav }) {
         {/* ACCENT BAR */}
         <div className="absolute top-0 left-0 w-full h-[6px] z-30" style={{ background: ACCENT_BAR }} />
 
-        {/* FULL-SCREEN SCROLL-SCRUBBED VIDEO
-            progress 0→0.45 = scrubbing through the footage
-            progress 0.45→0.6 = video fades out
-            progress 0.6→1.0 = scenes 1 & 2 with figure */}
+        {/* CANVAS — frames drawn here */}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full z-0"
+          style={{ opacity: 1 }}
+        />
+        {/* Dark gradient overlay on top of canvas */}
         <div
-          className="absolute inset-0 z-0"
-          style={{ opacity: videoOpacity, transition: "opacity 0.12s linear" }}
-        >
-          <ScrollScrubVideo src="/cloth-falling.mp4" progress={videoScrubProgress} />
-          <div
-            className="absolute inset-0"
-            style={{ background: "linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.18) 50%, transparent 100%)" }}
-          />
-        </div>
+          className="absolute inset-0 z-1 pointer-events-none"
+          style={{ background: "linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.18) 50%, transparent 100%)" }}
+        />
 
-        {/* TEXT OVERLAY */}
-        <div className="relative z-10 h-full flex items-end sm:items-center pb-20 sm:pb-0">
-          <div className="max-w-7xl mx-auto px-6 sm:px-10 w-full">
-            <div
-              style={{
-                opacity: textOpacity,
-                transform: `translateY(${textShift}px)`,
-                transition: "opacity 0.08s linear",
-              }}
-            >
-              <p
-                className="text-xs tracking-[0.3em] uppercase mb-4 font-medium"
-                style={{ color: onVideo ? "rgba(255,255,255,0.75)" : "#8a6cf0" }}
-              >
-                {scene.tag}
-              </p>
-              <h1
-                className="text-5xl sm:text-7xl font-black leading-[0.9] max-w-xl"
-                style={{ color: onVideo ? "#ffffff" : C.maroon }}
-              >
-                {scene.lines.map((line, i) => {
-                  const isAccent = sceneIndex === 0 && line === "Motion.";
-                  return (
-                    <span
-                      key={i}
-                      className="block"
-                      style={isAccent
-                        ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500 }
-                        : undefined}
-                    >
-                      {line}
-                    </span>
-                  );
-                })}
-              </h1>
-              <p
-                className="mt-5 max-w-md text-sm sm:text-base font-medium"
-                style={{ color: onVideo ? "rgba(255,255,255,0.8)" : C.inkSoft }}
-              >
-                {scene.sub}
-              </p>
-              {sceneIndex === SCENES.length - 1 && (
-                <div className="mt-8 flex flex-wrap gap-4">
-                  <button
-                    onClick={() => onNav("category", "shoes")}
-                    className="px-6 py-3 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105"
-                    style={{ background: C.maroon, color: C.bgSoft }}
-                  >
-                    Shop Now <ArrowRight size={16} />
-                  </button>
-                  <button
-                    onClick={() => onNav("category", "apparel")}
-                    className="px-6 py-3 rounded-full text-sm font-medium border"
-                    style={{ borderColor: onVideo ? "rgba(255,255,255,0.4)" : C.line, color: onVideo ? "#fff" : C.maroon }}
-                  >
-                    Explore Apparel
-                  </button>
-                </div>
-              )}
-            </div>
+        {/* LOADING BAR — shown while frames download */}
+        <div
+          ref={loadWrapRef}
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
+          style={{ background: "rgba(0,0,0,0.85)" }}
+        >
+          <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 11, letterSpacing: "0.15em", textTransform: "uppercase" }}>
+            Loading
+          </p>
+          <div style={{ width: 200, height: 2, background: "rgba(255,255,255,0.1)", borderRadius: 2 }}>
+            <div ref={loadBarRef} style={{ height: "100%", width: "0%", background: ACCENT_BAR, borderRadius: 2, transition: "width 0.1s linear" }} />
           </div>
         </div>
 
-        {/* ANIMATED FIGURE — desktop only, fades in after video */}
+        {/* TEXT SCENES — pre-rendered, toggled by rAF */}
+        <div className="relative z-10 h-full flex items-end sm:items-center pb-20 sm:pb-0">
+          <div className="max-w-7xl mx-auto px-6 sm:px-10 w-full">
+            {SCENES.map((scene, si) => (
+              <div
+                key={si}
+                ref={(el) => { textWrapsRef.current[si] = el; }}
+                style={{ display: si === 0 ? "block" : "none", willChange: "opacity, transform" }}
+              >
+                <p className="scene-tag text-xs tracking-[0.3em] uppercase mb-4 font-medium"
+                  style={{ color: "rgba(255,255,255,0.75)" }}>
+                  {scene.tag}
+                </p>
+                <h1 className="scene-h1 text-5xl sm:text-7xl font-black leading-[0.9] max-w-xl"
+                  style={{ color: "#ffffff" }}>
+                  {scene.lines.map((line, i) => {
+                    const isAccent = si === 0 && line === "Motion.";
+                    return (
+                      <span key={i} className="block"
+                        style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500 } : undefined}>
+                        {line}
+                      </span>
+                    );
+                  })}
+                </h1>
+                <p className="scene-sub mt-5 max-w-md text-sm sm:text-base font-medium"
+                  style={{ color: "rgba(255,255,255,0.8)" }}>
+                  {scene.sub}
+                </p>
+                {si === SCENES.length - 1 && (
+                  <div className="mt-8 flex flex-wrap gap-4">
+                    <button onClick={() => onNav("category", "shoes")}
+                      className="px-6 py-3 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105"
+                      style={{ background: C.maroon, color: C.bgSoft }}>
+                      Shop Now <ArrowRight size={16} />
+                    </button>
+                    <button onClick={() => onNav("category", "apparel")}
+                      className="px-6 py-3 rounded-full text-sm font-medium border"
+                      style={{ borderColor: "rgba(255,255,255,0.4)", color: "#fff" }}>
+                      Explore Apparel
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* ANIMATED FIGURE */}
         <div
+          ref={figWrapRef}
           className="absolute right-8 sm:right-16 top-1/2 -translate-y-1/2 z-10 hidden sm:block"
-          style={{ opacity: figureOpacity, transition: "opacity 0.05s linear" }}
+          style={{ opacity: 0 }}
         >
-          <div
-            className="absolute w-72 h-72 rounded-full blur-3xl opacity-30"
-            style={{ background: "radial-gradient(circle, #b25cf0, transparent)", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }}
-          />
-          <MovingFigure progress={progress} />
+          <div className="absolute w-72 h-72 rounded-full blur-3xl opacity-30"
+            style={{ background: "radial-gradient(circle, #b25cf0, transparent)", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }} />
+          <svg viewBox="0 0 200 380" width="280" height="532" style={{ overflow: "visible" }}>
+            <defs>
+              <linearGradient id="figGrad" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#7c6cf0" />
+                <stop offset="55%" stopColor="#b25cf0" />
+                <stop offset="100%" stopColor="#15c2c9" />
+              </linearGradient>
+            </defs>
+            <g ref={figGroupRef} style={{ transformOrigin: "100px 190px" }}>
+              <circle cx="100" cy="46" r="22" fill="none" stroke="url(#figGrad)" strokeWidth="4.5" />
+              <path d="M100,68 L100,170"   stroke="url(#figGrad)" strokeWidth="5" strokeLinecap="round" fill="none" />
+              <path d="M100,95 L80,150"    stroke="url(#figGrad)" strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.55" />
+              <path d="M100,95 L120,150"   stroke="url(#figGrad)" strokeWidth="5" strokeLinecap="round" fill="none" />
+              <line x1="78" y1="172" x2="122" y2="172" stroke="url(#figGrad)" strokeWidth="5" strokeLinecap="round" />
+              <path d="M88,172 L68,230 L68,300"    stroke="url(#figGrad)" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.55" />
+              <path d="M112,172 L132,230 L132,300"  stroke="url(#figGrad)" strokeWidth="6" strokeLinecap="round" fill="none" />
+            </g>
+          </svg>
         </div>
 
         {/* SCROLL HINT */}
-        <div
+        <div ref={hintRef}
           className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs tracking-widest uppercase z-10"
-          style={{ color: onVideo ? "rgba(255,255,255,0.6)" : C.inkSoft, opacity: 0.7 }}
-        >
-          {sceneIndex < SCENES.length - 1 ? "Keep scrolling" : "Scroll to browse"}
+          style={{ color: "rgba(255,255,255,0.6)", opacity: 0.7 }}>
+          Keep scrolling
         </div>
 
         {/* SCENE DOTS */}
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
           {SCENES.map((_, i) => (
-            <div
-              key={i}
-              className="w-2 h-2 rounded-full transition-all duration-300"
+            <div key={i}
+              ref={(el) => { dotsRef.current[i] = el; }}
+              className="w-2 h-2 rounded-full"
               style={{
-                background: i === sceneIndex ? (onVideo ? "#fff" : C.maroon) : "transparent",
-                border: `1.5px solid ${onVideo ? "#fff" : C.maroon}`,
-                opacity: i === sceneIndex ? 1 : 0.4,
-              }}
-            />
+                background: i === 0 ? "#fff" : "transparent",
+                border: "1.5px solid #fff",
+                opacity: i === 0 ? 1 : 0.4,
+              }} />
           ))}
         </div>
       </div>
