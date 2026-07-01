@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Video Scrub Debugger</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: monospace; background: #0f0f0f; color: #e0e0e0; padding: 24px; }
+  h1 { font-size: 16px; color: #fff; margin-bottom: 20px; letter-spacing: 0.05em; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; max-width: 960px; }
+  .card { background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 8px; padding: 16px; }
+  .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #888; margin-bottom: 12px; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0;
+         border-bottom: 1px solid #222; font-size: 12px; }
+  .row:last-child { border-bottom: none; }
+  .label { color: #888; }
+  .val { color: #e0e0e0; }
+  .pass { color: #4ade80; }
+  .fail { color: #f87171; }
+  .warn { color: #fbbf24; }
+  .pending { color: #60a5fa; }
+  video { width: 100%; aspect-ratio: 16/9; background: #000; border-radius: 6px; display: block; margin-bottom: 12px; }
+  input[type=range] { width: 100%; margin: 8px 0; accent-color: #b25cf0; }
+  .log { background: #111; border: 1px solid #2a2a2a; border-radius: 6px; padding: 12px;
+         font-size: 11px; line-height: 1.7; max-height: 200px; overflow-y: auto;
+         color: #9ca3af; margin-top: 16px; grid-column: 1 / -1; }
+  .log .e { color: #f87171; }
+  .log .ok { color: #4ade80; }
+  .log .w { color: #fbbf24; }
+  button { background: #b25cf0; color: #fff; border: none; border-radius: 6px;
+           padding: 8px 16px; font-size: 12px; cursor: pointer; margin-top: 8px; width: 100%; }
+  button:hover { background: #9333ea; }
+  #seekbar-wrap { margin-top: 8px; }
+  .big { font-size: 22px; font-weight: bold; color: #fff; }
+</style>
+</head>
+<body>
+<h1>🎬 Video Scrub Debugger — cloth-falling.mp4</h1>
+
+<div class="grid">
+
+  <!-- LEFT: live video + manual scrub -->
+  <div class="card">
+    <h2>Live Preview</h2>
+    <video id="vid" muted playsinline></video>
+    <div id="seekbar-wrap">
+      <div style="font-size:11px;color:#888;margin-bottom:4px;">Manual scrub (drag to test seeking)</div>
+      <input type="range" id="seekbar" min="0" max="1000" value="0" step="1">
+    </div>
+    <button id="btn-blob">Re-test: Fetch as Blob</button>
+    <button id="btn-direct" style="background:#374151;margin-top:6px;">Re-test: Direct src</button>
+  </div>
+
+  <!-- RIGHT: diagnostics -->
+  <div class="card">
+    <h2>Diagnostics</h2>
+
+    <div class="row">
+      <span class="label">Video file reachable</span>
+      <span class="val" id="d-fetch">⏳ testing…</span>
+    </div>
+    <div class="row">
+      <span class="label">Accept-Ranges header</span>
+      <span class="val" id="d-ranges">⏳ checking…</span>
+    </div>
+    <div class="row">
+      <span class="label">Content-Type</span>
+      <span class="val" id="d-ctype">—</span>
+    </div>
+    <div class="row">
+      <span class="label">File size</span>
+      <span class="val" id="d-size">—</span>
+    </div>
+    <div class="row">
+      <span class="label">Load method</span>
+      <span class="val" id="d-method">—</span>
+    </div>
+    <div class="row">
+      <span class="label">readyState</span>
+      <span class="val" id="d-ready">—</span>
+    </div>
+    <div class="row">
+      <span class="label">duration</span>
+      <span class="val" id="d-dur">—</span>
+    </div>
+    <div class="row">
+      <span class="label">seekable range</span>
+      <span class="val" id="d-seekable">—</span>
+    </div>
+    <div class="row">
+      <span class="label">Seek to 1s → result</span>
+      <span class="val" id="d-seektest">⏳ waiting…</span>
+    </div>
+    <div class="row">
+      <span class="label">currentTime after seek</span>
+      <span class="val" id="d-ct">—</span>
+    </div>
+    <div class="row">
+      <span class="label">Overall verdict</span>
+      <span class="val big" id="d-verdict">⏳</span>
+    </div>
+  </div>
+
+  <!-- LOG -->
+  <div class="log" id="log">Initialising…<br></div>
+</div>
+
+<script>
+const vid = document.getElementById("vid");
+const log = document.getElementById("log");
+const $ = (id) => document.getElementById(id);
+
+let method = "none";
+
+function logLine(msg, cls = "") {
+  const line = document.createElement("span");
+  if (cls) line.className = cls;
+  line.textContent = msg;
+  log.appendChild(line);
+  log.appendChild(document.createElement("br"));
+  log.scrollTop = log.scrollHeight;
+}
+
+function set(id, text, cls = "") {
+  const el = $(id);
+  el.textContent = text;
+  el.className = cls ? "val " + cls : "val";
+}
+
+function updateLive() {
+  const rs = ["HAVE_NOTHING","HAVE_METADATA","HAVE_CURRENT_DATA","HAVE_FUTURE_DATA","HAVE_ENOUGH_DATA"];
+  set("d-ready", `${vid.readyState} (${rs[vid.readyState] || "?"})`);
+  set("d-dur", vid.duration ? vid.duration.toFixed(3) + "s" : "NaN");
+  if (vid.seekable && vid.seekable.length > 0) {
+    set("d-seekable", `0 → ${vid.seekable.end(0).toFixed(3)}s`, "pass");
+  } else {
+    set("d-seekable", "none / empty", "fail");
+  }
+}
+
+// ── Step 1: HEAD request to check headers ─────────────────────────────
+async function checkHeaders() {
+  logLine("[1] HEAD /cloth-falling.mp4 …");
+  try {
+    const r = await fetch("/cloth-falling.mp4", { method: "HEAD" });
+    if (!r.ok) {
+      set("d-fetch", `HTTP ${r.status}`, "fail");
+      logLine(`[1] FAIL: HTTP ${r.status}`, "e");
+      return false;
+    }
+    set("d-fetch", `HTTP ${r.status} OK`, "pass");
+    logLine(`[1] OK: ${r.status}`, "ok");
+
+    const ar = r.headers.get("accept-ranges");
+    const ct = r.headers.get("content-type");
+    const cl = r.headers.get("content-length");
+
+    set("d-ctype", ct || "missing", ct ? "" : "warn");
+    set("d-size", cl ? (parseInt(cl)/1024/1024).toFixed(2) + " MB" : "unknown");
+
+    if (ar === "bytes") {
+      set("d-ranges", "bytes ✓", "pass");
+      logLine("[1] Accept-Ranges: bytes — direct src seeking should work", "ok");
+    } else {
+      set("d-ranges", ar ? ar : "MISSING ✗", "fail");
+      logLine(`[1] Accept-Ranges: ${ar || "not sent"} — seeking will fail without blob fetch!`, "w");
+    }
+    return true;
+  } catch (e) {
+    set("d-fetch", "NETWORK ERROR", "fail");
+    logLine(`[1] FAIL: ${e.message}`, "e");
+    return false;
+  }
+}
+
+// ── Step 2: Blob fetch ────────────────────────────────────────────────
+async function loadAsBlob() {
+  logLine("[2] Fetching full video as blob…");
+  set("d-method", "blob fetch in progress…", "pending");
+  try {
+    const r = await fetch("/cloth-falling.mp4");
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    vid.src = url;
+    vid.load();
+    method = "blob";
+    set("d-method", "blob: URL", "pass");
+    logLine(`[2] Blob fetched (${(blob.size/1024/1024).toFixed(2)} MB), assigned blob: URL`, "ok");
+    await waitForReady();
+  } catch(e) {
+    logLine(`[2] Blob fetch failed: ${e.message}`, "e");
+    set("d-method", "blob FAILED", "fail");
+    await loadDirect();
+  }
+}
+
+// ── Step 3: Direct src fallback ───────────────────────────────────────
+async function loadDirect() {
+  logLine("[3] Loading via direct src…");
+  vid.src = "/cloth-falling.mp4";
+  vid.load();
+  method = "direct";
+  set("d-method", "direct src", "warn");
+  await waitForReady();
+}
+
+// ── Wait for canplaythrough, then run seek test ───────────────────────
+function waitForReady() {
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      logLine("[ready] Timed out after 15s — video may not be loadable", "e");
+      set("d-seektest", "timeout", "fail");
+      updateLive();
+      runVerdict();
+      resolve();
+    }, 15000);
+
+    const onReady = () => {
+      clearTimeout(timeout);
+      logLine(`[ready] canplaythrough fired — duration=${vid.duration?.toFixed(3)}s readyState=${vid.readyState}`, "ok");
+      updateLive();
+      seekTest().then(resolve);
+    };
+
+    if (vid.readyState >= 4) { onReady(); return; }
+    vid.addEventListener("canplaythrough", onReady, { once: true });
+
+    // Also listen for error
+    vid.addEventListener("error", () => {
+      clearTimeout(timeout);
+      const err = vid.error;
+      logLine(`[ready] video error: code=${err?.code} msg=${err?.message}`, "e");
+      set("d-seektest", "video error", "fail");
+      updateLive();
+      runVerdict();
+      resolve();
+    }, { once: true });
+  });
+}
+
+// ── Seek test: jump to 1 second, check if it lands ───────────────────
+function seekTest() {
+  return new Promise((resolve) => {
+    if (!vid.duration || vid.duration < 1) {
+      set("d-seektest", "duration too short", "warn");
+      runVerdict();
+      resolve();
+      return;
+    }
+
+    logLine("[seek] Attempting seek to 1.0s…");
+    vid.currentTime = 1.0;
+
+    const timeout = setTimeout(() => {
+      const ct = vid.currentTime;
+      logLine(`[seek] seeked never fired. currentTime stuck at ${ct.toFixed(3)}`, "e");
+      set("d-seektest", `STUCK at ${ct.toFixed(3)}s`, "fail");
+      set("d-ct", ct.toFixed(3) + "s", ct < 0.5 ? "fail" : "pass");
+      updateLive();
+      runVerdict();
+      resolve();
+    }, 3000);
+
+    vid.addEventListener("seeked", () => {
+      clearTimeout(timeout);
+      const ct = vid.currentTime;
+      const ok = Math.abs(ct - 1.0) < 0.2;
+      logLine(`[seek] seeked fired → currentTime=${ct.toFixed(3)}s (${ok ? "PASS" : "FAIL"})`, ok ? "ok" : "e");
+      set("d-seektest", ok ? `✓ landed at ${ct.toFixed(3)}s` : `✗ landed at ${ct.toFixed(3)}s`, ok ? "pass" : "fail");
+      set("d-ct", ct.toFixed(3) + "s", ok ? "pass" : "fail");
+      updateLive();
+      runVerdict();
+      resolve();
+    }, { once: true });
+  });
+}
+
+// ── Verdict ───────────────────────────────────────────────────────────
+function runVerdict() {
+  const seekOk = $("d-seektest").textContent.startsWith("✓");
+  const dur    = parseFloat($("d-dur").textContent) || 0;
+
+  if (seekOk && dur > 0) {
+    set("d-verdict", "✅ WORKS", "pass");
+    logLine("VERDICT: Seeking works — scrubbing should function correctly.", "ok");
+  } else if (dur > 0 && !seekOk) {
+    set("d-verdict", "❌ CAN'T SEEK", "fail");
+    logLine("VERDICT: Video loads but seeking fails. This is a server/encoding issue.", "e");
+    logLine("→ Fix: re-encode with `ffmpeg -i input.mp4 -movflags faststart output.mp4`", "w");
+    logLine("→ Or: ensure your server sends Accept-Ranges: bytes", "w");
+  } else {
+    set("d-verdict", "❌ WON'T LOAD", "fail");
+    logLine("VERDICT: Video doesn't load at all. Check path, CORS, and file existence.", "e");
+  }
+}
+
+// ── Manual seekbar ────────────────────────────────────────────────────
+$("seekbar").addEventListener("input", (e) => {
+  if (vid.duration) {
+    vid.currentTime = (e.target.value / 1000) * vid.duration;
+    updateLive();
+  }
+});
+
+// Poll readyState while loading
+setInterval(updateLive, 500);
+
+// ── Buttons ───────────────────────────────────────────────────────────
+$("btn-blob").addEventListener("click", async () => {
+  log.innerHTML = "Re-running with blob…<br>";
+  await checkHeaders();
+  await loadAsBlob();
+});
+
+$("btn-direct").addEventListener("click", async () => {
+  log.innerHTML = "Re-running with direct src…<br>";
+  await checkHeaders();
+  await loadDirect();
+});
+
+// ── Auto-run ──────────────────────────────────────────────────────────
+(async () => {
+  await checkHeaders();
+  await loadAsBlob();
+})();
+</script>
+</body>
+</html>
