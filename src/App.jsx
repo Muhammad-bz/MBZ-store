@@ -156,57 +156,89 @@ function MovingFigure({ progress }) {
   );
 }
 
-/* Mobile-optimized scroll scrub video.
-   Android Chrome blocks currentTime seeking until the video has been
-   "activated" by a play event. We play→pause immediately on load to
-   unlock seeking, then drive currentTime from scroll progress. */
+/* Canvas-based scroll scrub — the video element is hidden and only used
+   as a frame source. On every seek we draw that frame to a <canvas>,
+   which is what the user actually sees. This bypasses Android Chrome's
+   "video keeps autoplaying" problem and gives reliable per-frame control.
+   
+   IMPORTANT: for the smoothest possible result on mobile, the ideal
+   upgrade is an image sequence (60-120 JPEGs extracted from the video)
+   — that's what Apple and premium Awwwards sites actually use. This
+   canvas approach is the best we can do with a raw video file. */
 function ScrollScrubVideo({ src, progress }) {
   const videoRef = useRef(null);
-  const [duration, setDuration] = useState(0);
-  const [activated, setActivated] = useState(false);
-  const rafRef = useRef(null);
+  const canvasRef = useRef(null);
+  const meta = useRef({ ready: false, duration: 0 });
 
-  // Activate: play briefly then pause to unlock mobile seeking
+  // Draw current video frame to canvas, scaled to cover
+  const drawFrame = useCallback(() => {
+    const v = videoRef.current;
+    const c = canvasRef.current;
+    if (!v || !c || !v.videoWidth) return;
+    const ctx = c.getContext("2d");
+    const cw = c.offsetWidth, ch = c.offsetHeight;
+    if (c.width !== cw) c.width = cw;
+    if (c.height !== ch) c.height = ch;
+    // object-fit: cover math
+    const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+    const dx = (cw - v.videoWidth * scale) / 2;
+    const dy = (ch - v.videoHeight * scale) / 2;
+    ctx.drawImage(v, dx, dy, v.videoWidth * scale, v.videoHeight * scale);
+  }, []);
+
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
+
     const onMeta = async () => {
-      setDuration(v.duration);
+      meta.current.duration = v.duration;
       try {
+        // play→pause unlocks Android Chrome's currentTime API
         await v.play();
         v.pause();
         v.currentTime = 0;
-        setActivated(true);
-      } catch {
-        // Autoplay blocked — still mark activated, scrubbing may partially work
-        setActivated(true);
-      }
+      } catch (_) {}
+      meta.current.ready = true;
+      drawFrame();
     };
-    v.addEventListener("loadedmetadata", onMeta);
-    return () => v.removeEventListener("loadedmetadata", onMeta);
-  }, []);
 
-  // Drive currentTime from scroll using rAF for smooth mobile performance
+    v.addEventListener("loadedmetadata", onMeta);
+    v.addEventListener("seeked", drawFrame);
+    return () => {
+      v.removeEventListener("loadedmetadata", onMeta);
+      v.removeEventListener("seeked", drawFrame);
+    };
+  }, [drawFrame]);
+
+  // Seek on every scroll tick — canvas updates via the "seeked" event above
   useEffect(() => {
     const v = videoRef.current;
-    if (!v || !activated || !duration) return;
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    rafRef.current = requestAnimationFrame(() => {
-      const target = Math.max(0, Math.min(duration - 0.04, progress * duration));
-      if (Math.abs(v.currentTime - target) > 0.016) v.currentTime = target;
-    });
-    return () => { if (rafRef.current) cancelAnimationFrame(rafRef.current); };
-  }, [progress, activated, duration]);
+    const { ready, duration } = meta.current;
+    if (!v || !ready || !duration) return;
+    const target = Math.max(0, Math.min(duration - 0.04, progress * duration));
+    if (Math.abs(v.currentTime - target) > 0.016) {
+      v.pause(); // prevent browser from auto-resuming
+      v.currentTime = target;
+    }
+  }, [progress]);
 
   return (
-    <video
-      ref={videoRef}
-      src={src}
-      muted
-      playsInline
-      preload="auto"
-      className="absolute inset-0 w-full h-full object-cover"
-    />
+    <div className="absolute inset-0">
+      {/* Video hidden — only used as a pixel source */}
+      <video
+        ref={videoRef}
+        src={src}
+        muted
+        playsInline
+        preload="auto"
+        style={{ display: "none" }}
+      />
+      {/* Canvas shows the frames */}
+      <canvas
+        ref={canvasRef}
+        className="absolute inset-0 w-full h-full"
+      />
+    </div>
   );
 }
 
