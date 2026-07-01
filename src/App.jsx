@@ -185,7 +185,10 @@ const FRAME_COUNT     = 60;   // ← smoothness (60 is great, 90 is silky)
 const FRAME_PATH = (n) => {
   // n is 0-indexed; spread frames evenly across the video duration
   const t = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(2);
-  return `${CLOUDINARY_BASE}/so_${t}/${CLOUDINARY_ID}.jpg`;
+  // w_1280: serve at 1280px wide (crisp on mobile retina, reasonable file size)
+  // q_auto:best: Cloudinary picks optimal quality
+  // c_fill,g_auto: crop to fill, smart gravity
+  return `${CLOUDINARY_BASE}/w_1280,q_auto:best,c_fill,g_auto/so_${t}/${CLOUDINARY_ID}.jpg`;
 };
 
 /* Preload all frames and report progress */
@@ -204,7 +207,7 @@ function preloadFrames(onProgress) {
       const img = new Image();
       img.onload  = done;
       img.onerror = done; // skip missing frames gracefully
-      img.src = FRAME_PATH(i + 1); // frames are 1-indexed from ffmpeg
+      img.src = FRAME_PATH(i); // 0-indexed, evenly spread across VIDEO_DURATION
       images[i] = img;
     }
   });
@@ -266,9 +269,13 @@ function CinematicHero({ onNav }) {
       const canvas = canvasRef.current;
       const frames = framesRef.current;
       if (canvas && frames.length > 0) {
+        const dpr = window.devicePixelRatio || 1;
         const cw = canvas.clientWidth, ch = canvas.clientHeight;
-        if (canvas.width !== cw || canvas.height !== ch) {
-          canvas.width = cw; canvas.height = ch;
+        // Use physical pixels for sharp rendering on mobile retina screens
+        const pw = Math.round(cw * dpr), ph = Math.round(ch * dpr);
+        if (canvas.width !== pw || canvas.height !== ph) {
+          canvas.width = pw; canvas.height = ph;
+          canvas.getContext("2d").scale(dpr, dpr);
         }
         const videoScrubProgress = Math.min(1, p / VIDEO_END);
         const frameIndex = Math.min(frames.length - 1,
@@ -386,8 +393,14 @@ function CinematicHero({ onNav }) {
         {/* CANVAS — frames drawn here */}
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 w-full h-full z-0"
-          style={{ opacity: 1 }}
+          className="absolute inset-0 z-0"
+          style={{
+            opacity: 1,
+            width: "100%",
+            height: "100%",
+            // Prevent canvas from being CSS-scaled on mobile which causes blur
+            imageRendering: "auto",
+          }}
         />
         {/* Dark gradient overlay on top of canvas */}
         <div
