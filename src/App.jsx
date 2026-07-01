@@ -27,7 +27,6 @@ function GlobalFonts() {
       @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&family=Plus+Jakarta+Sans:wght@500;700;800;900&display=swap');
       @keyframes storeSweep { 0% { transform: translateX(-15%); } 100% { transform: translateX(15%); } }
       @keyframes rackHang { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
-      @keyframes spin { to { transform: rotate(360deg); } }
     `}</style>
   );
 }
@@ -157,190 +156,68 @@ function MovingFigure({ progress }) {
   );
 }
 
-/* ─────────────────────────────────────────────────────────────────────────
-   OPTIMISED CINEMATIC HERO
-   Key changes vs the original:
-   1. NO React state updates on scroll — progress lives in a ref only.
-   2. A single requestAnimationFrame loop (not one-per-scroll-event) drives
-      all DOM mutations: video.currentTime, opacity, transform, text swaps.
-   3. video.currentTime is written inside rAF, after the browser is ready to
-      accept a new frame — this is what browsers require for smooth scrubbing.
-   4. Scroll listener is { passive: true } and only sets a dirty flag + stores
-      the raw scrollY — it never touches the DOM itself.
-   5. CSS `transition` is removed from anything driven by JS to prevent the
-      browser fighting itself (JS sets a value, CSS transition overrides it on
-      the next paint, causing jitter).
-   6. The figure SVG is mutated via direct attribute writes (no React re-render).
-   7. Text scene-switching is done via display:none/block on pre-rendered nodes
-      rather than re-rendering JSX each frame.
-   8. Video stays fully visible for the whole scroll (no fade-out), remaining
-      visible at its final scrubbed frame after the section is passed.
-   ─────────────────────────────────────────────────────────────────────────── */
+/* Mobile-compatible video hero — autoplay works on Android/iOS, currentTime
+   scrubbing does not. Video plays automatically, scroll controls visibility. */
+function AutoplayVideo({ src }) {
+  const videoRef = useRef(null);
+
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    // Attempt autoplay — muted + playsinline satisfies mobile browser policies
+    v.play().catch(() => {});
+  }, []);
+
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      muted
+      playsInline
+      loop
+      preload="auto"
+      className="absolute inset-0 w-full h-full object-cover"
+    />
+  );
+}
 
 function CinematicHero({ onNav }) {
-  const containerRef  = useRef(null);
-  const videoRef      = useRef(null);
-  const figGroupRef   = useRef(null);   // <g> inside the SVG
-  const figWrapRef    = useRef(null);   // outer div for figure opacity
-  const textWrapsRef  = useRef([]);     // one div per scene
-  const dotsRef       = useRef([]);     // dot elements
-  const hintRef       = useRef(null);
-  const videoDuration = useRef(0);
-  const rafId         = useRef(null);
-  const progressRef   = useRef(0);
-  const lastSceneRef  = useRef(-1);
-  const loadingRef    = useRef(null);
-
-  // poses: [x, y, rot, arm, leg, scale]
-  const poses = [
-    { x: -8,  y: 0,   rot: -3, arm: 18,  leg: 14,  scale: 1.0  },
-    { x: 4,   y: -14, rot: 4,  arm: -22, leg: -16, scale: 1.05 },
-    { x: 0,   y: -4,  rot: 0,  arm: 6,   leg: 2,   scale: 1.12 },
-  ];
-
-  // ── Fetch video as blob so Chrome can seek regardless of server headers ──
-  // GitHub raw / many Vercel configs don't send Accept-Ranges, which means
-  // the browser refuses random-access seeks and stays frozen on frame 0.
-  // A fully-downloaded blob: URL is always seekable.
-  const blobUrlRef   = useRef(null);
-  const videoReadyRef = useRef(false); // true once blob is assigned + canplay fired
+  const containerRef = useRef(null);
+  const [progress, setProgress] = useState(0);
 
   useEffect(() => {
-    let revoked = false;
-    const video = videoRef.current;
-    if (!video) return;
-
-    // Show a loading overlay while fetching
-    if (loadingRef.current) loadingRef.current.style.display = "flex";
-
-    fetch("/cloth-falling.mp4")
-      .then((r) => {
-        if (!r.ok) throw new Error("fetch failed");
-        return r.blob();
-      })
-      .then((blob) => {
-        if (revoked) return;
-        const url = URL.createObjectURL(blob);
-        blobUrlRef.current = url;
-        video.src = url;
-        video.load();
-      })
-      .catch(() => {
-        // fallback: just use the original src and hope for the best
-        video.src = "/cloth-falling.mp4";
-        video.load();
-      });
-
-    const onCanPlay = () => {
-      videoReadyRef.current = true;
-      videoDuration.current = video.duration;
-      if (loadingRef.current) loadingRef.current.style.display = "none";
-    };
-    video.addEventListener("canplaythrough", onCanPlay);
-
-    return () => {
-      revoked = true;
-      video.removeEventListener("canplaythrough", onCanPlay);
-      if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current);
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // rAF loop: reads progressRef, writes DOM
-  useEffect(() => {
-    const lerp = (a, b, t) => a + (b - a) * t;
-
-    const tick = () => {
-      rafId.current = requestAnimationFrame(tick);
-      const p = progressRef.current;
-
-      // video scrub — only seek once the blob is loaded and seekable
-      const video = videoRef.current;
-      const dur   = videoDuration.current;
-      if (video && dur > 0 && videoReadyRef.current) {
-        const target = Math.min(dur - 0.04, Math.max(0, p * dur));
-        if (Math.abs(video.currentTime - target) > 0.016) {
-          video.currentTime = target;
-        }
-      }
-
-      // scene & figure
-      const sceneFloat = p * (SCENES.length - 1);
-      const scene      = Math.min(SCENES.length - 1, Math.floor(sceneFloat));
-      const local      = sceneFloat - scene;
-      const sceneIndex = Math.min(SCENES.length - 1, Math.round(sceneFloat));
-
-      const a = poses[Math.min(scene, poses.length - 1)];
-      const b = poses[Math.min(scene + 1, poses.length - 1)];
-      const x     = lerp(a.x,     b.x,     local);
-      const y     = lerp(a.y,     b.y,     local);
-      const rot   = lerp(a.rot,   b.rot,   local);
-      const arm   = lerp(a.arm,   b.arm,   local);
-      const leg   = lerp(a.leg,   b.leg,   local);
-      const scale = lerp(a.scale, b.scale, local);
-
-      const g = figGroupRef.current;
-      if (g) {
-        g.style.transform = `translate(${x}px,${y}px) rotate(${rot}deg) scale(${scale})`;
-        const paths = g.querySelectorAll("path,line");
-        if (paths[0]) paths[0].setAttribute("d", `M100,68 L${100 - rot * 0.3},170`);
-        if (paths[1]) paths[1].setAttribute("d", `M100,95 L${100 - arm * 1.1},150`);
-        if (paths[2]) paths[2].setAttribute("d", `M100,95 L${100 + arm * 1.3},150`);
-        if (paths[4]) paths[4].setAttribute("d", `M88,172 L${88 - leg * 1.4},230 L${88 - leg * 1.1},300`);
-        if (paths[5]) paths[5].setAttribute("d", `M112,172 L${112 + leg * 1.4},230 L${112 + leg * 1.1},300`);
-      }
-
-      const figureOpacity = Math.min(1, Math.max(0, (sceneFloat - 1.0) * 4));
-      if (figWrapRef.current) figWrapRef.current.style.opacity = figureOpacity;
-
-      // text scenes
-      if (sceneIndex !== lastSceneRef.current) {
-        lastSceneRef.current = sceneIndex;
-        textWrapsRef.current.forEach((el, i) => {
-          if (el) el.style.display = i === sceneIndex ? "block" : "none";
-        });
-        dotsRef.current.forEach((dot, i) => {
-          if (!dot) return;
-          dot.style.opacity    = i === sceneIndex ? "1" : "0.4";
-          dot.style.background = i === sceneIndex ? C.maroon : "transparent";
-        });
-        if (hintRef.current) {
-          hintRef.current.textContent =
-            sceneIndex < SCENES.length - 1 ? "Keep scrolling" : "Scroll to browse";
-        }
-      }
-
-      const distFromCenter = Math.abs(sceneFloat - sceneIndex);
-      const textOpacity    = 1 - Math.min(1, distFromCenter * 3.2);
-      const textShift      = distFromCenter * 24;
-      const activeWrap = textWrapsRef.current[sceneIndex];
-      if (activeWrap) {
-        activeWrap.style.opacity   = textOpacity;
-        activeWrap.style.transform = `translateY(${textShift}px)`;
-      }
-    };
-
-    rafId.current = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(rafId.current);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // passive scroll listener: only updates ref, never touches DOM
-  useEffect(() => {
-    const onScroll = () => {
+    const handleScroll = () => {
       const el = containerRef.current;
       if (!el) return;
-      const rect    = el.getBoundingClientRect();
-      const total   = rect.height - window.innerHeight;
+      const rect = el.getBoundingClientRect();
+      const total = rect.height - window.innerHeight;
       const scrolled = -rect.top;
-      progressRef.current = total > 0 ? Math.min(1, Math.max(0, scrolled / total)) : 0;
+      const p = total > 0 ? Math.min(1, Math.max(0, scrolled / total)) : 0;
+      setProgress(p);
     };
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
+    handleScroll();
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    window.addEventListener("resize", handleScroll);
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("scroll", handleScroll);
+      window.removeEventListener("resize", handleScroll);
     };
   }, []);
+
+  const sceneFloat = progress * (SCENES.length - 1);
+  const sceneIndex = Math.min(SCENES.length - 1, Math.round(sceneFloat));
+  const scene = SCENES[sceneIndex];
+
+  const distFromCenter = Math.abs(sceneFloat - sceneIndex);
+  const textOpacity = 1 - Math.min(1, distFromCenter * 3.2);
+  const textShift = distFromCenter * 24;
+
+  // Video visible through scene 0, fades out cleanly at scene 0→1 transition
+  const videoOpacity = Math.max(0, 1 - Math.max(0, sceneFloat - 0.7) * 5);
+  // Figure fades in after video is gone
+  const figureOpacity = Math.min(1, Math.max(0, (sceneFloat - 1.0) * 4));
+  // Text is white on video, maroon on cream background
+  const onVideo = videoOpacity > 0.3;
 
   return (
     <div ref={containerRef} style={{ height: "400vh", position: "relative" }}>
@@ -351,128 +228,100 @@ function CinematicHero({ onNav }) {
         {/* ACCENT BAR */}
         <div className="absolute top-0 left-0 w-full h-[6px] z-30" style={{ background: ACCENT_BAR }} />
 
-        {/* FULL-SCREEN VIDEO — always visible, scrubbed by scroll */}
-        <div className="absolute inset-0 z-0">
-          <video
-            ref={videoRef}
-            src="/cloth-falling.mp4"
-            muted
-            playsInline
-            preload="auto"
-            className="absolute inset-0 w-full h-full object-cover"
-          />
-          <div className="absolute inset-0" style={{
-            background: "linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.15) 60%, transparent 100%)"
-          }} />
-          {/* Loading indicator — shown while video blob is being fetched */}
-          <div
-            ref={loadingRef}
-            className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-20"
-            style={{ background: "rgba(0,0,0,0.7)", display: "flex" }}
-          >
-            <div style={{
-              width: 40, height: 40, borderRadius: "50%",
-              border: "3px solid rgba(255,255,255,0.15)",
-              borderTopColor: "#b25cf0",
-              animation: "spin 0.8s linear infinite",
-            }} />
-            <p style={{ color: "rgba(255,255,255,0.6)", fontSize: 12, letterSpacing: "0.15em" }}>
-              LOADING VIDEO
-            </p>
-          </div>
-        </div>
-
-        {/* TEXT SCENES — pre-rendered, toggled via display not remount */}
-        <div className="relative z-10 h-full flex items-center">
-          <div className="max-w-7xl mx-auto px-6 sm:px-10 w-full">
-            {SCENES.map((scene, sceneIndex) => (
-              <div
-                key={sceneIndex}
-                ref={(el) => { textWrapsRef.current[sceneIndex] = el; }}
-                style={{
-                  display: sceneIndex === 0 ? "block" : "none",
-                  opacity: sceneIndex === 0 ? 1 : 0,
-                  willChange: "opacity, transform",
-                }}
-              >
-                <p className="text-xs tracking-[0.3em] uppercase mb-4 font-medium"
-                  style={{ color: "rgba(255,255,255,0.75)" }}>
-                  {scene.tag}
-                </p>
-                <h1 className="text-5xl sm:text-7xl font-black leading-[0.9] max-w-xl"
-                  style={{ color: "#ffffff" }}>
-                  {scene.lines.map((line, i) => {
-                    const isAccent = sceneIndex === 0 && line === "Motion.";
-                    return (
-                      <span key={i} className="block"
-                        style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500 } : undefined}>
-                        {line}
-                      </span>
-                    );
-                  })}
-                </h1>
-                <p className="mt-5 max-w-md text-sm sm:text-base font-medium"
-                  style={{ color: "rgba(255,255,255,0.8)" }}>
-                  {scene.sub}
-                </p>
-                {sceneIndex === SCENES.length - 1 && (
-                  <div className="mt-8 flex flex-wrap gap-4">
-                    <button
-                      onClick={() => onNav("category", "shoes")}
-                      className="px-6 py-3 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105"
-                      style={{ background: C.maroon, color: C.bgSoft }}
-                    >
-                      Shop Now <ArrowRight size={16} />
-                    </button>
-                    <button
-                      onClick={() => onNav("category", "apparel")}
-                      className="px-6 py-3 rounded-full text-sm font-medium border transition-colors"
-                      style={{ borderColor: "rgba(255,255,255,0.5)", color: "#ffffff" }}
-                    >
-                      Explore Apparel
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ANIMATED FIGURE */}
+        {/* FULL-SCREEN VIDEO — autoplays, fades out as you scroll past scene 0 */}
         <div
-          ref={figWrapRef}
-          className="absolute right-8 sm:right-16 top-1/2 -translate-y-1/2 z-10 hidden sm:block"
-          style={{ opacity: 0 }}
+          className="absolute inset-0 z-0"
+          style={{ opacity: videoOpacity, transition: "opacity 0.1s linear" }}
         >
-          <div className="absolute w-72 h-72 rounded-full blur-3xl opacity-30"
-            style={{ background: "radial-gradient(circle, #b25cf0, transparent)", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }} />
-          <svg viewBox="0 0 200 380" width="280" height="532" style={{ overflow: "visible" }}>
-            <defs>
-              <linearGradient id="figGrad" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0%"   stopColor="#7c6cf0" />
-                <stop offset="55%"  stopColor="#b25cf0" />
-                <stop offset="100%" stopColor="#15c2c9" />
-              </linearGradient>
-            </defs>
-            <g ref={figGroupRef} style={{ transformOrigin: "100px 190px" }}>
-              <circle cx="100" cy="46" r="22" fill="none" stroke="url(#figGrad)" strokeWidth="4.5" />
-              <path d="M100,68 L100,170" stroke="url(#figGrad)" strokeWidth="5" strokeLinecap="round" fill="none" />
-              <path d="M100,95 L80,150"  stroke="url(#figGrad)" strokeWidth="5" strokeLinecap="round" fill="none" opacity="0.55" />
-              <path d="M100,95 L120,150" stroke="url(#figGrad)" strokeWidth="5" strokeLinecap="round" fill="none" />
-              <line x1="78" y1="172" x2="122" y2="172" stroke="url(#figGrad)" strokeWidth="5" strokeLinecap="round" />
-              <path d="M88,172 L68,230 L68,300"   stroke="url(#figGrad)" strokeWidth="6" strokeLinecap="round" fill="none" opacity="0.55" />
-              <path d="M112,172 L132,230 L132,300" stroke="url(#figGrad)" strokeWidth="6" strokeLinecap="round" fill="none" />
-            </g>
-          </svg>
+          <AutoplayVideo src="/cloth-falling.mp4" />
+          {/* gradient so text is readable over any footage */}
+          <div
+            className="absolute inset-0"
+            style={{ background: "linear-gradient(135deg, rgba(0,0,0,0.6) 0%, rgba(0,0,0,0.2) 50%, transparent 100%)" }}
+          />
+        </div>
+
+        {/* TEXT OVERLAY */}
+        <div className="relative z-10 h-full flex items-end sm:items-center pb-20 sm:pb-0">
+          <div className="max-w-7xl mx-auto px-6 sm:px-10 w-full">
+            <div
+              style={{
+                opacity: textOpacity,
+                transform: `translateY(${textShift}px)`,
+                transition: "opacity 0.08s linear",
+              }}
+            >
+              <p
+                className="text-xs tracking-[0.3em] uppercase mb-4 font-medium"
+                style={{ color: onVideo ? "rgba(255,255,255,0.75)" : "#8a6cf0" }}
+              >
+                {scene.tag}
+              </p>
+              <h1
+                className="text-5xl sm:text-7xl font-black leading-[0.9] max-w-xl"
+                style={{ color: onVideo ? "#ffffff" : C.maroon }}
+              >
+                {scene.lines.map((line, i) => {
+                  const isAccent = sceneIndex === 0 && line === "Motion.";
+                  return (
+                    <span
+                      key={i}
+                      className="block"
+                      style={isAccent
+                        ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500 }
+                        : undefined}
+                    >
+                      {line}
+                    </span>
+                  );
+                })}
+              </h1>
+              <p
+                className="mt-5 max-w-md text-sm sm:text-base font-medium"
+                style={{ color: onVideo ? "rgba(255,255,255,0.8)" : C.inkSoft }}
+              >
+                {scene.sub}
+              </p>
+              {sceneIndex === SCENES.length - 1 && (
+                <div className="mt-8 flex flex-wrap gap-4">
+                  <button
+                    onClick={() => onNav("category", "shoes")}
+                    className="px-6 py-3 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105"
+                    style={{ background: C.maroon, color: C.bgSoft }}
+                  >
+                    Shop Now <ArrowRight size={16} />
+                  </button>
+                  <button
+                    onClick={() => onNav("category", "apparel")}
+                    className="px-6 py-3 rounded-full text-sm font-medium border"
+                    style={{ borderColor: onVideo ? "rgba(255,255,255,0.4)" : C.line, color: onVideo ? "#fff" : C.maroon }}
+                  >
+                    Explore Apparel
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* ANIMATED FIGURE — desktop only, fades in after video */}
+        <div
+          className="absolute right-8 sm:right-16 top-1/2 -translate-y-1/2 z-10 hidden sm:block"
+          style={{ opacity: figureOpacity, transition: "opacity 0.05s linear" }}
+        >
+          <div
+            className="absolute w-72 h-72 rounded-full blur-3xl opacity-30"
+            style={{ background: "radial-gradient(circle, #b25cf0, transparent)", top: "50%", left: "50%", transform: "translate(-50%,-50%)" }}
+          />
+          <MovingFigure progress={progress} />
         </div>
 
         {/* SCROLL HINT */}
         <div
-          ref={hintRef}
           className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs tracking-widest uppercase z-10"
-          style={{ color: "rgba(255,255,255,0.6)", opacity: 0.7 }}
+          style={{ color: onVideo ? "rgba(255,255,255,0.6)" : C.inkSoft, opacity: 0.7 }}
         >
-          Keep scrolling
+          {sceneIndex < SCENES.length - 1 ? "Keep scrolling" : "Scroll to browse"}
         </div>
 
         {/* SCENE DOTS */}
@@ -480,12 +329,11 @@ function CinematicHero({ onNav }) {
           {SCENES.map((_, i) => (
             <div
               key={i}
-              ref={(el) => { dotsRef.current[i] = el; }}
-              className="w-2 h-2 rounded-full"
+              className="w-2 h-2 rounded-full transition-all duration-300"
               style={{
-                background: i === 0 ? C.maroon : "transparent",
-                border: `1.5px solid ${C.maroon}`,
-                opacity: i === 0 ? 1 : 0.4,
+                background: i === sceneIndex ? (onVideo ? "#fff" : C.maroon) : "transparent",
+                border: `1.5px solid ${onVideo ? "#fff" : C.maroon}`,
+                opacity: i === sceneIndex ? 1 : 0.4,
               }}
             />
           ))}
@@ -494,7 +342,6 @@ function CinematicHero({ onNav }) {
     </div>
   );
 }
-
 
 /* ========================= TILT PRODUCT CARD ========================= */
 
