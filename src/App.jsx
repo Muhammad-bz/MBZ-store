@@ -183,8 +183,8 @@ const FRAME_PATH = (n) => {
   const id        = mob ? MOBILE_ID : DESKTOP_ID;
   // z_1.2 zooms in 20% to fill frame better and hide watermark naturally
   const transform = mob
-    ? "w_1080,h_1920,c_fill,g_center,z_1.2,q_auto:best"
-    : "w_1920,h_1080,c_fill,g_center,z_1.15,q_auto:best";
+    ? "w_1080,h_1920,c_fill,g_center,z_1.6,q_auto:best"
+    : "w_1920,h_1080,c_fill,g_center,z_1.3,q_auto:best";
   return `${CLOUDINARY_BASE}/${transform}/so_${t}/${id}.jpg`;
 };
 
@@ -273,7 +273,7 @@ function CinematicHero({ onNav }) {
     const VIDEO_END      = 1.00; // scrub video across full scroll
     const VIDEO_FADE_END = 1.00; // canvas never fades — final frame stays
     // Text trigger: 2.3s / 3.0s = 76.7% of video = 76.7% of scroll
-    const TEXT_START     = 0.833; // 2.5s / 3s = text appears when clothes are fully on ground
+    const TEXT_START     = 0.800; // 2.4s / 3s — text begins fading in as pile settles
     const TEXT_END       = 0.85;  // fully visible by this point, stays forever
 
     const tick = () => {
@@ -371,8 +371,9 @@ function CinematicHero({ onNav }) {
       const tShift = (1 - textVisible) * 20; // subtle rise on fade-in, then locks
       const activeWrap = textWrapsRef.current[sceneIndex];
       if (activeWrap) {
-        activeWrap.style.opacity   = tOp;
-        activeWrap.style.transform = `translateY(${tShift}px)`;
+        // Always write opacity so it can never get stuck at a stale value
+        activeWrap.style.opacity   = tOp.toFixed(4);
+        activeWrap.style.transform = `translateY(${tShift.toFixed(2)}px)`;
         // update text colors
         const tag = activeWrap.querySelector(".scene-tag");
         const h1  = activeWrap.querySelector(".scene-h1");
@@ -447,7 +448,7 @@ function CinematicHero({ onNav }) {
         </div>
 
         {/* TEXT SCENES — pre-rendered, toggled by rAF */}
-        <div className="relative z-10 h-full flex items-center sm:items-end justify-center sm:pb-[12vh]">
+        <div className="relative z-10 h-full flex items-start justify-center" style={{ paddingTop: "42vh" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             {SCENES.map((scene, si) => (
               <div
@@ -456,7 +457,7 @@ function CinematicHero({ onNav }) {
                 style={{ display: si === 0 ? "block" : "none", opacity: 0, willChange: "opacity, transform" }}
               >
 
-                <h1 className="scene-h1 text-5xl sm:text-7xl font-black leading-[0.9] mx-auto"
+                <h1 className="scene-h1 text-3xl sm:text-5xl font-black leading-[0.9] mx-auto"
                   style={{ color: C.maroon }}>
                   {scene.lines.map((line, i) => {
                     const isAccent = si === 0 && line === "Motion.";
@@ -468,19 +469,19 @@ function CinematicHero({ onNav }) {
                     );
                   })}
                 </h1>
-                <p className="scene-sub mt-5 max-w-md mx-auto text-sm sm:text-base font-medium"
+                <p className="scene-sub mt-3 max-w-md mx-auto text-xs sm:text-sm font-medium"
                   style={{ color: C.inkSoft }}>
                   {scene.sub}
                 </p>
                 {si === SCENES.length - 1 && (
-                  <div className="mt-8 flex flex-row items-center justify-center gap-4">
+                  <div className="mt-4 flex flex-row items-center justify-center gap-3">
                     <button onClick={() => onNav("category", "shoes")}
-                      className="px-6 py-3 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105"
+                      className="px-5 py-2.5 rounded-full text-xs font-medium flex items-center gap-2 transition-transform hover:scale-105"
                       style={{ background: C.maroon, color: C.bgSoft }}>
                       Order Now <ArrowRight size={16} />
                     </button>
                     <button onClick={() => onNav("category", "apparel")}
-                      className="px-6 py-3 rounded-full text-sm font-medium border"
+                      className="px-5 py-2.5 rounded-full text-xs font-medium border"
                       style={{ borderColor: C.maroon, color: C.maroon }}>
                       Explore Apparel
                     </button>
