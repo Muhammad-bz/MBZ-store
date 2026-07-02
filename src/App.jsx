@@ -171,9 +171,9 @@ const CLOUDINARY_BASE = "https://res.cloudinary.com/leu4dssl/video/upload";
 
 // Separate videos: 9:16 for mobile, 16:9 for desktop
 const MOBILE_ID      = "v1782988492/lv_0_20260702132747_dz3imr";
-const DESKTOP_ID     = "v1782988509/lv_0_20260702153131_zuafdg";
+const DESKTOP_ID     = "v1782990615/lv_0_20260702160728_bxppy7";
 const VIDEO_DURATION = 3;
-const FRAME_COUNT    = 60;
+const FRAME_COUNT    = 90; // more frames = smoother motion
 
 const isMobile = () => window.innerWidth < 768;
 
@@ -181,10 +181,10 @@ const FRAME_PATH = (n) => {
   const t         = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(2);
   const mob       = isMobile();
   const id        = mob ? MOBILE_ID : DESKTOP_ID;
-  // g_north anchors to top, cropping bottom where KlingAI watermark sits
+  // z_1.2 zooms in 20% to fill frame better and hide watermark naturally
   const transform = mob
-    ? "w_1080,h_1920,c_fill,g_north,q_auto:best"
-    : "w_1920,h_1080,c_fill,g_north,q_auto:best";
+    ? "w_1080,h_1920,c_fill,g_center,z_1.2,q_auto:best"
+    : "w_1920,h_1080,c_fill,g_center,z_1.15,q_auto:best";
   return `${CLOUDINARY_BASE}/${transform}/so_${t}/${id}.jpg`;
 };
 
@@ -293,20 +293,20 @@ function CinematicHero({ onNav }) {
           canvas.getContext("2d").scale(dpr, dpr);
         }
         const videoScrubProgress = Math.min(1, p / VIDEO_END);
-        const frameIndex = Math.min(frames.length - 1,
-          Math.floor(videoScrubProgress * frames.length));
         const ctx = canvas.getContext("2d");
-        // Draw current frame — for smoother blending between frames,
-        // paint previous frame first then overlay current at full opacity.
-        // This removes the "jump" between frames caused by integer rounding.
-        const prevIndex = Math.max(0, frameIndex - 1);
-        if (prevIndex !== frameIndex && frames[prevIndex]?.naturalWidth) {
-          drawImageCover(ctx, frames[prevIndex], cw, ch);
-          ctx.globalAlpha = Math.min(1, (videoScrubProgress * frames.length) % 1 + 0.5);
-          drawImageCover(ctx, frames[frameIndex], cw, ch);
+        // Smooth inter-frame blending: draw prev frame, crossfade to current
+        // using the sub-frame fractional position for pixel-perfect smoothness
+        const exactPos  = videoScrubProgress * (frames.length - 1);
+        const loIdx     = Math.floor(exactPos);
+        const hiIdx     = Math.min(frames.length - 1, loIdx + 1);
+        const alpha     = exactPos - loIdx; // 0.0 → 1.0 between frames
+        if (frames[loIdx]?.naturalWidth) {
+          drawImageCover(ctx, frames[loIdx], cw, ch);
+        }
+        if (hiIdx !== loIdx && frames[hiIdx]?.naturalWidth && alpha > 0) {
+          ctx.globalAlpha = alpha;
+          drawImageCover(ctx, frames[hiIdx], cw, ch);
           ctx.globalAlpha = 1;
-        } else {
-          drawImageCover(ctx, frames[frameIndex], cw, ch);
         }
 
         // canvas opacity: full during scrub, fade after
@@ -360,10 +360,7 @@ function CinematicHero({ onNav }) {
           dot.style.background = i === sceneIndex ? (onVideo ? "#fff" : C.maroon) : "transparent";
           dot.style.borderColor = onVideo ? "#fff" : C.maroon;
         });
-        if (hintRef.current) {
-          hintRef.current.textContent = sceneIndex < SCENES.length - 1 ? "Keep scrolling" : "Scroll to browse";
-          hintRef.current.style.color = onVideo ? "rgba(255,255,255,0.6)" : C.inkSoft;
-        }
+// hint removed
       }
 
       // per-frame text transition
@@ -450,17 +447,17 @@ function CinematicHero({ onNav }) {
         </div>
 
         {/* TEXT SCENES — pre-rendered, toggled by rAF */}
-        <div className="relative z-10 h-full flex items-center justify-center">
-          <div className="w-full text-center px-6">
+        <div className="relative z-10 h-full flex items-center sm:items-end justify-center sm:pb-[12vh]">
+          <div className="w-full max-w-2xl mx-auto text-center px-6">
             {SCENES.map((scene, si) => (
               <div
                 key={si}
                 ref={(el) => { textWrapsRef.current[si] = el; }}
-                style={{ display: si === 0 ? "block" : "none", willChange: "opacity, transform" }}
+                style={{ display: si === 0 ? "block" : "none", opacity: 0, willChange: "opacity, transform" }}
               >
 
                 <h1 className="scene-h1 text-5xl sm:text-7xl font-black leading-[0.9] mx-auto"
-                  style={{ color: "#ffffff" }}>
+                  style={{ color: C.maroon }}>
                   {scene.lines.map((line, i) => {
                     const isAccent = si === 0 && line === "Motion.";
                     return (
@@ -471,8 +468,8 @@ function CinematicHero({ onNav }) {
                     );
                   })}
                 </h1>
-                <p className="scene-sub mt-5 max-w-md text-sm sm:text-base font-medium"
-                  style={{ color: "rgba(255,255,255,0.8)" }}>
+                <p className="scene-sub mt-5 max-w-md mx-auto text-sm sm:text-base font-medium"
+                  style={{ color: C.inkSoft }}>
                   {scene.sub}
                 </p>
                 {si === SCENES.length - 1 && (
@@ -522,12 +519,7 @@ function CinematicHero({ onNav }) {
           </svg>
         </div>
 
-        {/* SCROLL HINT — subtle down arrow while video is playing */}
-        <div ref={hintRef}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1"
-          style={{ color: C.inkSoft, opacity: 0.5 }}>
-          <div style={{ width: 1, height: 32, background: C.inkSoft, opacity: 0.4 }} />
-        </div>
+
 
 
       </div>
