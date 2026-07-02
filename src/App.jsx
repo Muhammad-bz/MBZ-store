@@ -168,18 +168,24 @@ function MovingFigure({ progress }) {
 //   Cloudinary free tier has generous transformation limits.
 
 const CLOUDINARY_BASE = "https://res.cloudinary.com/leu4dssl/video/upload";
-const CLOUDINARY_ID   = "v1782978137/lv_0_20260702124030_ex4bc5";
-const VIDEO_DURATION  = 3;    // 3 second video
-const FRAME_COUNT     = 90;   // 90 frames across 3s = 30fps equivalent
+
+// Separate videos: 9:16 for mobile, 16:9 for desktop
+const MOBILE_ID      = "v1782988492/lv_0_20260702132747_dz3imr";
+const DESKTOP_ID     = "v1782988509/lv_0_20260702153131_zuafdg";
+const VIDEO_DURATION = 3;
+const FRAME_COUNT    = 60;
+
+const isMobile = () => window.innerWidth < 768;
 
 const FRAME_PATH = (n) => {
-  // n is 0-indexed; spread frames evenly across the video duration
-  const t = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(2);
-  // w_1280: serve at 1280px wide (crisp on mobile retina, reasonable file size)
-  // q_auto:best: Cloudinary picks optimal quality
-  // c_fill,g_auto: crop to fill, smart gravity
-  // 9:16 crop, best quality, served at 1080×1920 for sharp mobile + desktop
-  return `${CLOUDINARY_BASE}/w_1080,h_1920,c_fill,g_auto,q_auto:best/so_${t}/${CLOUDINARY_ID}.jpg`;
+  const t         = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(2);
+  const mob       = isMobile();
+  const id        = mob ? MOBILE_ID : DESKTOP_ID;
+  // g_north anchors to top, cropping bottom where KlingAI watermark sits
+  const transform = mob
+    ? "w_1080,h_1920,c_fill,g_north,q_auto:best"
+    : "w_1920,h_1080,c_fill,g_north,q_auto:best";
+  return `${CLOUDINARY_BASE}/${transform}/so_${t}/${id}.jpg`;
 };
 
 /* Preload all frames and report progress */
@@ -239,12 +245,27 @@ function CinematicHero({ onNav }) {
 
   // ── preload frames on mount ────────────────────────────────────────
   useEffect(() => {
-    preloadFrames((pct) => {
-      if (loadBarRef.current)  loadBarRef.current.style.width  = `${pct * 100}%`;
-      if (loadWrapRef.current && pct >= 1) loadWrapRef.current.style.display = "none";
-    }).then((images) => {
-      framesRef.current = images;
-    });
+    let cancelled = false;
+    const load = () => {
+      framesRef.current = [];
+      if (loadWrapRef.current) loadWrapRef.current.style.display = "flex";
+      if (loadBarRef.current)  loadBarRef.current.style.width = "0%";
+      preloadFrames((pct) => {
+        if (loadBarRef.current) loadBarRef.current.style.width = `${pct * 100}%`;
+        if (loadWrapRef.current && pct >= 1) loadWrapRef.current.style.display = "none";
+      }).then((images) => {
+        if (!cancelled) framesRef.current = images;
+      });
+    };
+    load();
+    // Reload frames if user rotates phone or resizes to cross the 768px breakpoint
+    let lastMobile = isMobile();
+    const onResize = () => {
+      const nowMobile = isMobile();
+      if (nowMobile !== lastMobile) { lastMobile = nowMobile; load(); }
+    };
+    window.addEventListener("resize", onResize, { passive: true });
+    return () => { cancelled = true; window.removeEventListener("resize", onResize); };
   }, []);
 
   // ── rAF loop ───────────────────────────────────────────────────────
@@ -388,7 +409,7 @@ function CinematicHero({ onNav }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ height: "280vh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "180vh", position: "relative" }}>
       <div
         className="sticky top-0 h-screen overflow-hidden"
         style={{ background: `linear-gradient(180deg, ${C.bgSoft} 0%, ${C.bg} 100%)`, fontFamily: FONT_BODY }}
