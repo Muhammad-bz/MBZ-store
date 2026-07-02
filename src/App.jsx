@@ -84,17 +84,7 @@ const SCENES = [
   {
     tag: "CHAPTER ONE — THE START LINE",
     lines: ["Built for", "Motion."],
-    sub: "Every stride engineered, every fiber tested.",
-  },
-  {
-    tag: "CHAPTER TWO — IN STRIDE",
-    lines: ["Made to", "keep up."],
-    sub: "From sprint to studio, gear that moves how you move.",
-  },
-  {
-    tag: "CHAPTER THREE — THE DROP",
-    lines: ["Wear the", "new season."],
-    sub: "MBZ — shoes, apparel and accessories for restless people.",
+    sub: "The Only Interactive Motion Website You Need",
   },
 ];
 
@@ -178,9 +168,9 @@ function MovingFigure({ progress }) {
 //   Cloudinary free tier has generous transformation limits.
 
 const CLOUDINARY_BASE = "https://res.cloudinary.com/leu4dssl/video/upload";
-const CLOUDINARY_ID   = "v1782906874/lv_0_20260701165054_v4aozt";
-const VIDEO_DURATION  = 6;    // adjust if your video is longer/shorter
-const FRAME_COUNT     = 90;   // more frames = smoother blending
+const CLOUDINARY_ID   = "v1782978137/lv_0_20260702124030_ex4bc5";
+const VIDEO_DURATION  = 3;    // 3 second video
+const FRAME_COUNT     = 90;   // 90 frames across 3s = 30fps equivalent
 
 const FRAME_PATH = (n) => {
   // n is 0-indexed; spread frames evenly across the video duration
@@ -188,7 +178,7 @@ const FRAME_PATH = (n) => {
   // w_1280: serve at 1280px wide (crisp on mobile retina, reasonable file size)
   // q_auto:best: Cloudinary picks optimal quality
   // c_fill,g_auto: crop to fill, smart gravity
-  // ar_9:16 + c_fill ensures proper crop for portrait video on all screens
+  // 9:16 crop, best quality, served at 1080×1920 for sharp mobile + desktop
   return `${CLOUDINARY_BASE}/w_1080,h_1920,c_fill,g_auto,q_auto:best/so_${t}/${CLOUDINARY_ID}.jpg`;
 };
 
@@ -259,8 +249,11 @@ function CinematicHero({ onNav }) {
 
   // ── rAF loop ───────────────────────────────────────────────────────
   useEffect(() => {
-    const VIDEO_END      = 0.85; // scrub video for first 85% of scroll
-    const VIDEO_FADE_END = 1.00; // canvas stays fully visible — no fade out
+    const VIDEO_END      = 1.00; // scrub video across full scroll
+    const VIDEO_FADE_END = 1.00; // canvas never fades — final frame stays
+    // Text trigger: 2.3s / 3.0s = 76.7% of video = 76.7% of scroll
+    const TEXT_START     = 0.833; // 2.5s / 3s = text appears when clothes are fully on ground
+    const TEXT_END       = 0.85;  // fully visible by this point, stays forever
 
     const tick = () => {
       rafRef.current = requestAnimationFrame(tick);
@@ -303,7 +296,7 @@ function CinematicHero({ onNav }) {
       }
 
       // ── figure pose ──────────────────────────────────────────────
-      const sceneProgress = Math.max(0, (p - VIDEO_END) / (1 - VIDEO_END));
+      const sceneProgress = Math.max(0, (p - TEXT_START) / (1 - TEXT_START));
       const sceneFloat    = sceneProgress * (SCENES.length - 1);
       const scene         = Math.min(SCENES.length - 1, Math.floor(sceneFloat));
       const local         = sceneFloat - scene;
@@ -326,11 +319,11 @@ function CinematicHero({ onNav }) {
         if (paths[5]) paths[5].setAttribute("d", `M112,172 L${112 + leg * 1.4},230 L${112 + leg * 1.1},300`);
       }
 
-      const figureOpacity = Math.min(1, Math.max(0, (p - 0.90) / 0.1));
+      const figureOpacity = 0; // hidden — text over cloth pile is the hero moment
       if (figWrapRef.current) figWrapRef.current.style.opacity = figureOpacity;
 
       // ── text scenes ──────────────────────────────────────────────
-      const onVideo = true; // video always visible underneath
+      const onVideo = false; // use dark text — video bg is light cream
       const textColor    = onVideo ? "#ffffff" : C.maroon;
       const subColor     = onVideo ? "rgba(255,255,255,0.8)" : C.inkSoft;
       const tagColor     = onVideo ? "rgba(255,255,255,0.75)" : "#8a6cf0";
@@ -353,11 +346,11 @@ function CinematicHero({ onNav }) {
       }
 
       // per-frame text transition
-      // Text hidden during video scrub, fades in when clothes hit the ground (~85%+)
-      const textVisible = Math.min(1, Math.max(0, (p - 0.82) / 0.08));
-      const dist  = Math.abs(sceneFloat - sceneIndex);
-      const tOp   = textVisible * (1 - Math.min(1, dist * 3.2));
-      const tShift = (1 - textVisible) * 40 + dist * 24;
+      // Text fades in at 2.3s mark (~76.7% scroll), stays visible forever after
+      // Fade in at 2.5s mark, lock permanently at full opacity after that
+      const textVisible = Math.min(1, Math.max(0, (p - TEXT_START) / 0.08));
+      const tOp    = textVisible; // fades in at 2.5s, stays permanently
+      const tShift = (1 - textVisible) * 20; // subtle rise on fade-in, then locks
       const activeWrap = textWrapsRef.current[sceneIndex];
       if (activeWrap) {
         activeWrap.style.opacity   = tOp;
@@ -395,7 +388,7 @@ function CinematicHero({ onNav }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ height: "300vh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "280vh", position: "relative" }}>
       <div
         className="sticky top-0 h-screen overflow-hidden"
         style={{ background: `linear-gradient(180deg, ${C.bgSoft} 0%, ${C.bg} 100%)`, fontFamily: FONT_BODY }}
@@ -436,25 +429,22 @@ function CinematicHero({ onNav }) {
         </div>
 
         {/* TEXT SCENES — pre-rendered, toggled by rAF */}
-        <div className="relative z-10 h-full flex items-end sm:items-center pb-20 sm:pb-0">
-          <div className="max-w-7xl mx-auto px-6 sm:px-10 w-full">
+        <div className="relative z-10 h-full flex items-center justify-center">
+          <div className="w-full text-center px-6">
             {SCENES.map((scene, si) => (
               <div
                 key={si}
                 ref={(el) => { textWrapsRef.current[si] = el; }}
                 style={{ display: si === 0 ? "block" : "none", willChange: "opacity, transform" }}
               >
-                <p className="scene-tag text-xs tracking-[0.3em] uppercase mb-4 font-medium"
-                  style={{ color: "rgba(255,255,255,0.75)" }}>
-                  {scene.tag}
-                </p>
-                <h1 className="scene-h1 text-5xl sm:text-7xl font-black leading-[0.9] max-w-xl"
+
+                <h1 className="scene-h1 text-5xl sm:text-7xl font-black leading-[0.9] mx-auto"
                   style={{ color: "#ffffff" }}>
                   {scene.lines.map((line, i) => {
                     const isAccent = si === 0 && line === "Motion.";
                     return (
                       <span key={i} className="block"
-                        style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500 } : undefined}>
+                        style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: C.maroon } : undefined}>
                         {line}
                       </span>
                     );
@@ -465,15 +455,15 @@ function CinematicHero({ onNav }) {
                   {scene.sub}
                 </p>
                 {si === SCENES.length - 1 && (
-                  <div className="mt-8 flex flex-wrap gap-4">
+                  <div className="mt-8 flex flex-row items-center justify-center gap-4">
                     <button onClick={() => onNav("category", "shoes")}
                       className="px-6 py-3 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105"
                       style={{ background: C.maroon, color: C.bgSoft }}>
-                      Shop Now <ArrowRight size={16} />
+                      Order Now <ArrowRight size={16} />
                     </button>
                     <button onClick={() => onNav("category", "apparel")}
                       className="px-6 py-3 rounded-full text-sm font-medium border"
-                      style={{ borderColor: "rgba(255,255,255,0.4)", color: "#fff" }}>
+                      style={{ borderColor: C.maroon, color: C.maroon }}>
                       Explore Apparel
                     </button>
                   </div>
@@ -511,26 +501,14 @@ function CinematicHero({ onNav }) {
           </svg>
         </div>
 
-        {/* SCROLL HINT */}
+        {/* SCROLL HINT — subtle down arrow while video is playing */}
         <div ref={hintRef}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 text-xs tracking-widest uppercase z-10"
-          style={{ color: "rgba(255,255,255,0.6)", opacity: 0.7 }}>
-          Keep scrolling
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1"
+          style={{ color: C.inkSoft, opacity: 0.5 }}>
+          <div style={{ width: 1, height: 32, background: C.inkSoft, opacity: 0.4 }} />
         </div>
 
-        {/* SCENE DOTS */}
-        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
-          {SCENES.map((_, i) => (
-            <div key={i}
-              ref={(el) => { dotsRef.current[i] = el; }}
-              className="w-2 h-2 rounded-full"
-              style={{
-                background: i === 0 ? "#fff" : "transparent",
-                border: "1.5px solid #fff",
-                opacity: i === 0 ? 1 : 0.4,
-              }} />
-          ))}
-        </div>
+
       </div>
     </div>
   );
