@@ -184,7 +184,7 @@ const FRAME_PATH = (n) => {
   // z_1.2 zooms in 20% to fill frame better and hide watermark naturally
   const transform = mob
     ? "w_1080,h_1920,c_fill,g_center,z_1.6,q_auto:best"
-    : "w_1920,h_1080,c_fill,g_center,z_1.3,q_auto:best";
+    : "w_1920,h_1080,c_fill,g_south,z_2.0,q_auto:best";
   return `${CLOUDINARY_BASE}/${transform}/so_${t}/${id}.jpg`;
 };
 
@@ -448,7 +448,7 @@ function CinematicHero({ onNav }) {
         </div>
 
         {/* TEXT SCENES — pre-rendered, toggled by rAF */}
-        <div className="relative z-10 h-full flex items-start justify-center" style={{ paddingTop: "42vh" }}>
+        <div className="relative z-10 h-full flex items-start justify-center pt-[42vh] sm:pt-[55vh]">
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             {SCENES.map((scene, si) => (
               <div
