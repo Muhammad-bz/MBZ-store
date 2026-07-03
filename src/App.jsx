@@ -448,7 +448,7 @@ function CinematicHero({ onNav }) {
         </div>
 
         {/* TEXT SCENES — pre-rendered, toggled by rAF */}
-        <div className="relative z-10 h-full flex items-start justify-center pt-[42vh] sm:pt-[55vh]">
+        <div className="relative z-10 h-full flex items-start justify-center pt-[42vh] sm:pt-[38vh]">
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             {SCENES.map((scene, si) => (
               <div
