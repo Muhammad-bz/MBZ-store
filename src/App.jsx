@@ -26,7 +26,7 @@ function GlobalFonts() {
   return (
     <style>{`
       @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&family=Plus+Jakarta+Sans:wght@500;700;800;900&display=swap');
-      @keyframes rackHang { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+      @keyframes rackHang  { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
       @keyframes hintPulse { 0%, 100% { opacity: 0.5; transform: translateY(0); } 50% { opacity: 1; transform: translateY(4px); } }
     `}</style>
   );
@@ -543,21 +543,103 @@ function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, se
 }
 
 /* ══════════════════════════════════════════════════════════
-   HOME PAGE
+   CATEGORY SECTION  —  scroll-triggered directional entrance
+   Mobile:  shoes ← left │ apparel ↑ bottom │ accessories → right (0.55s delay)
+   Desktop: staggered fade-up (directional looks off in a 3-col row)
 ══════════════════════════════════════════════════════════ */
-function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
-  const featured = PRODUCTS.slice(0, 4);
-  return (
-    <div>
-      <CinematicHero onNav={onNav} />
+/* ══════════════════════════════════════════════════════════
+   CATEGORY SECTION  —  scroll-progress-driven, per-card tracking
+   Mobile:  each card tracks its own viewport entry individually
+            shoes ← left | apparel ↑ bottom | accessories → right
+   Desktop: section-level trigger, staggered fade-up
+══════════════════════════════════════════════════════════ */
+function CategorySection({ onNav }) {
+  const sectionRef = useRef(null);
+  const cardRefs   = useRef([]);
+  const rafRef     = useRef(null);
 
-      <section className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
+  useEffect(() => {
+    // easeOutCubic — snappy in, soft landing
+    const ease = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+
+    const onScroll = () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(() => {
+        const vh = window.innerHeight;
+        const isMobile = window.innerWidth < 640;
+        const [shoes, apparel, acc] = cardRefs.current;
+        if (!shoes || !apparel || !acc) return;
+
+        if (isMobile) {
+          // Each card uses its OWN bounding rect so stacked cards
+          // don't all complete their animation simultaneously
+          const cp = (el) => {
+            const { top } = el.getBoundingClientRect();
+            // 0 = card top at viewport bottom (just entering)
+            // 1 = card top is 35% down from viewport top (settled)
+            return ease((vh - top) / (vh * 0.65));
+          };
+          const p0 = cp(shoes);
+          const p1 = cp(apparel);
+          const p2 = cp(acc);
+
+          shoes.style.transform   = `translateX(${(1 - p0) * -110}%)`;
+          shoes.style.opacity     = p0.toFixed(3);
+          apparel.style.transform = `translateY(${(1 - p1) * 80}%)`;
+          apparel.style.opacity   = p1.toFixed(3);
+          acc.style.transform     = `translateX(${(1 - p2) * 110}%)`;
+          acc.style.opacity       = p2.toFixed(3);
+        } else {
+          // Desktop: one shared trigger on section entry, staggered windows
+          const { top } = sectionRef.current.getBoundingClientRect();
+          const raw = (vh - top) / (vh * 0.6);
+          const p0 = ease(raw);
+          const p1 = ease(raw - 0.15);
+          const p2 = ease(raw - 0.30);
+
+          shoes.style.transform   = `translateY(${(1 - p0) * 28}px)`;
+          shoes.style.opacity     = p0.toFixed(3);
+          apparel.style.transform = `translateY(${(1 - p1) * 28}px)`;
+          apparel.style.opacity   = p1.toFixed(3);
+          acc.style.transform     = `translateY(${(1 - p2) * 28}px)`;
+          acc.style.opacity       = p2.toFixed(3);
+        }
+      });
+    };
+
+    // Start fully hidden
+    cardRefs.current.forEach((el) => {
+      if (el) { el.style.opacity = "0"; }
+    });
+
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    onScroll();
+    return () => {
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
+  return (
+    <div style={{ overflow: "hidden" }}>
+      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {Object.entries(CATEGORY_META).map(([key, meta]) => {
+          {Object.entries(CATEGORY_META).map(([key, meta], i) => {
             const Icon = meta.icon;
             return (
-              <button key={key} onClick={() => onNav("category", key)} className="group relative h-56 rounded-2xl overflow-hidden text-left">
-                <div className="absolute inset-0 transition-transform duration-500 group-hover:scale-110" style={{ background: `radial-gradient(circle at 70% 30%, hsl(${meta.hue} 80% 58%), hsl(${meta.hue} 55% 18%))` }} />
+              <button
+                key={key}
+                ref={(el) => { cardRefs.current[i] = el; }}
+                onClick={() => onNav("category", key)}
+                className="group relative h-56 rounded-2xl overflow-hidden text-left"
+                style={{ opacity: 0, willChange: "transform, opacity" }}
+              >
+                <div
+                  className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
+                  style={{ background: `radial-gradient(circle at 70% 30%, hsl(${meta.hue} 80% 58%), hsl(${meta.hue} 55% 18%))` }}
+                />
                 <div className="absolute inset-0 bg-black/15 group-hover:bg-black/5 transition-colors" />
                 <div className="relative z-10 h-full flex flex-col justify-between p-6">
                   <Icon size={28} className="text-white/90" strokeWidth={1.25} />
@@ -571,6 +653,20 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
           })}
         </div>
       </section>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   HOME PAGE
+══════════════════════════════════════════════════════════ */
+function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
+  const featured = PRODUCTS.slice(0, 4);
+  return (
+    <div>
+      <CinematicHero onNav={onNav} />
+
+      <CategorySection onNav={onNav} />
 
       <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
         <div className="flex items-end justify-between mb-6">
