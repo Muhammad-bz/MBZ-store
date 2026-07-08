@@ -191,8 +191,8 @@ function drawImageCover(ctx, img, W, H) {
 
 // Scroll thresholds
 const VIDEO_END    = 1.00; // video scrubs full 100% of scroll
-const TEXT_START   = 0.80; // text begins fading in (≈ 2.4 s into video)
-const TEXT_END     = 0.88; // text fully opaque — stays forever after
+const TEXT_START   = 0.90; // text begins fading in when video nearly done
+const TEXT_END     = 1.00; // text fully opaque at very end of scroll
 
 function CinematicHero({ onNav }) {
   const containerRef = useRef(null);
@@ -310,11 +310,10 @@ function CinematicHero({ onNav }) {
     const onScroll = () => {
       const el = containerRef.current;
       if (!el) return;
-      const navH  = 64; // navbar height
-      const rect  = el.getBoundingClientRect();
-      const top   = rect.top - navH;
-      const total = rect.height - window.innerHeight;
-      progressRef.current = total > 0 ? Math.min(1, Math.max(0, -top / total)) : 0;
+      const offsetTop = el.offsetTop;
+      const total     = el.offsetHeight - window.innerHeight;
+      const scrolled  = window.scrollY - offsetTop;
+      progressRef.current = total > 0 ? Math.min(1, Math.max(0, scrolled / total)) : 0;
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -341,13 +340,13 @@ function CinematicHero({ onNav }) {
           style={{ width: "100%", height: "100%", top: "-18%", imageRendering: "auto" }}
         />
 
-        {/* Bottom fade — blends video into page background seamlessly */}
+        {/* Bottom fade — blends video into page background, also covers watermark */}
         <div
           className="absolute bottom-0 left-0 right-0 pointer-events-none"
           style={{
             zIndex: 2,
-            height: "28%",
-            background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)`,
+            height: "38%",
+            background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 85%)`,
           }}
         />
 
@@ -368,7 +367,7 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — fades in at 2.4 s mark, stays permanently */}
+        {/* Text — fades in when video ends, centered */}
         <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10 }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div
@@ -852,7 +851,9 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <CategorySection onNav={onNav} />
+      <div style={{ marginTop: "-40vh", position: "relative", zIndex: 10 }}>
+        <CategorySection onNav={onNav} />
+      </div>
 
       <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
         <div className="flex items-end justify-between mb-6">
