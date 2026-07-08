@@ -116,8 +116,8 @@ const FRAME_PATH = (n, mobile) => {
   const t  = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(3);
   const id = mobile ? MOBILE_ID : DESKTOP_ID;
   const tr = mobile
-    ? "w_1080,h_1920,c_fill,g_north,z_1.6,e_brightness:8,q_auto:best"
-    : "w_1920,h_1080,c_fill,g_north,z_1.8,e_brightness:8,q_auto:best";
+    ? "w_1080,h_1920,c_fill,g_center,e_brightness:8,q_auto:best"
+    : "w_1920,h_1080,c_fill,g_center,e_brightness:8,q_auto:best";
   return `${CLOUDINARY_BASE}/${tr}/so_${t}/${id}.jpg`;
 };
 
@@ -310,9 +310,11 @@ function CinematicHero({ onNav }) {
     const onScroll = () => {
       const el = containerRef.current;
       if (!el) return;
+      const navH  = 64; // navbar height
       const rect  = el.getBoundingClientRect();
+      const top   = rect.top - navH;
       const total = rect.height - window.innerHeight;
-      progressRef.current = total > 0 ? Math.min(1, Math.max(0, -rect.top / total)) : 0;
+      progressRef.current = total > 0 ? Math.min(1, Math.max(0, -top / total)) : 0;
     };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -335,8 +337,8 @@ function CinematicHero({ onNav }) {
         {/* Canvas — full screen, holds last frame permanently */}
         <canvas
           ref={canvasRef}
-          className="absolute inset-x-0 z-0"
-          style={{ width: "100%", height: "115%", top: "-15%", imageRendering: "auto" }}
+          className="absolute inset-0 z-0"
+          style={{ width: "100%", height: "100%", imageRendering: "auto" }}
         />
 
         {/* Bottom fade — blends video into page background seamlessly */}
