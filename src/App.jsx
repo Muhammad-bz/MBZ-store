@@ -285,6 +285,14 @@ function CinematicHero({ onNav }) {
           drawImageCover(ctx, frames[hiIdx], W, H);
           ctx.globalAlpha = 1;
         }
+
+        // Draw bottom fade gradient directly on canvas — guarantees perfect blend with page bg
+        const grad = ctx.createLinearGradient(0, H * 0.52, 0, H);
+        grad.addColorStop(0, "rgba(244,236,224,0)");
+        grad.addColorStop(1, "rgba(244,236,224,1)");
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+
         // Canvas stays at opacity 1 — last frame holds permanently
       }
 
@@ -309,29 +317,36 @@ function CinematicHero({ onNav }) {
 
   // ── Passive scroll listener ──────────────────────────────────────
   useEffect(() => {
-    let offsetTop = 0;
+    let cachedOffsetTop = 0;
 
     const measure = () => {
-      if (containerRef.current) offsetTop = containerRef.current.offsetTop;
+      if (containerRef.current) {
+        // Walk up the DOM to get true offsetTop from document root
+        let top = 0;
+        let el  = containerRef.current;
+        while (el) { top += el.offsetTop; el = el.offsetParent; }
+        cachedOffsetTop = top;
+      }
     };
-
-    // Measure after first paint so navbar height is settled
-    requestAnimationFrame(() => { measure(); });
-    window.addEventListener("resize", measure, { passive: true });
 
     const onScroll = () => {
       const el = containerRef.current;
       if (!el) return;
       const total   = el.offsetHeight - window.innerHeight;
-      const scrolled = window.scrollY - offsetTop;
+      const scrolled = window.scrollY - cachedOffsetTop;
       progressRef.current = total > 0 ? Math.min(1, Math.max(0, scrolled / total)) : 0;
     };
 
-    onScroll();
+    // Measure after paint, then on every resize (catches Chrome URL bar collapse)
+    requestAnimationFrame(() => { measure(); onScroll(); });
+
+    const ro = new ResizeObserver(() => { measure(); onScroll(); });
+    ro.observe(document.documentElement);
+
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", measure);
+      ro.disconnect();
     };
   }, []);
 
@@ -349,16 +364,6 @@ function CinematicHero({ onNav }) {
           ref={canvasRef}
           className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }}
-        />
-
-        {/* Bottom fade — blends video into page background, covers watermark */}
-        <div
-          className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{
-            zIndex: 2,
-            height: "45%",
-            background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 80%)`,
-          }}
         />
 
         {/* Loading overlay */}
