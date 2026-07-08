@@ -116,8 +116,8 @@ const FRAME_PATH = (n, mobile) => {
   const t  = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(3);
   const id = mobile ? MOBILE_ID : DESKTOP_ID;
   const tr = mobile
-    ? "w_1080,h_1920,c_fill,g_center,z_1.6,e_brightness:8,q_auto:best"
-    : "w_1920,h_1080,c_fill,g_center,z_1.8,e_brightness:8,q_auto:best";
+    ? "w_1080,h_1920,c_fill,g_north,z_1.6,e_brightness:8,q_auto:best"
+    : "w_1920,h_1080,c_fill,g_north,z_1.8,e_brightness:8,q_auto:best";
   return `${CLOUDINARY_BASE}/${tr}/so_${t}/${id}.jpg`;
 };
 
@@ -339,6 +339,16 @@ function CinematicHero({ onNav }) {
           style={{ width: "100%", height: "100%", opacity: 1, imageRendering: "auto" }}
         />
 
+        {/* Bottom fade — blends video into page background seamlessly */}
+        <div
+          className="absolute bottom-0 left-0 right-0 pointer-events-none"
+          style={{
+            zIndex: 2,
+            height: "28%",
+            background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)`,
+          }}
+        />
+
         {/* Loading overlay */}
         <div
           ref={loadWrapRef}
@@ -485,7 +495,6 @@ function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, se
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
     <header className="sticky top-0 z-40" style={{ background: "#5C3D2A" }}>
-      <div className="h-[3px]" style={{ background: ACCENT_BAR }} />
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: C.bgSoft }}>MBZ</button>
 
