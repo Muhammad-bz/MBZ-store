@@ -590,19 +590,16 @@ function CategorySection({ onNav }) {
           acc.style.transform     = `translateX(${(1 - p2) * 110}%)`;
           acc.style.opacity       = p2.toFixed(3);
         } else {
-          // Desktop: one shared trigger on section entry, staggered windows
+          // Desktop: all three trigger simultaneously with same progress
           const { top } = sectionRef.current.getBoundingClientRect();
-          const raw = (vh - top) / (vh * 0.6);
-          const p0 = ease(raw);
-          const p1 = ease(raw - 0.15);
-          const p2 = ease(raw - 0.30);
+          const p = ease((vh - top) / (vh * 0.6));
 
-          shoes.style.transform   = `translateY(${(1 - p0) * 28}px)`;
-          shoes.style.opacity     = p0.toFixed(3);
-          apparel.style.transform = `translateY(${(1 - p1) * 28}px)`;
-          apparel.style.opacity   = p1.toFixed(3);
-          acc.style.transform     = `translateY(${(1 - p2) * 28}px)`;
-          acc.style.opacity       = p2.toFixed(3);
+          shoes.style.transform   = `translateX(${(1 - p) * -110}%)`;
+          shoes.style.opacity     = p.toFixed(3);
+          apparel.style.transform = `translateY(${(1 - p) * 80}%)`;
+          apparel.style.opacity   = p.toFixed(3);
+          acc.style.transform     = `translateX(${(1 - p) * 110}%)`;
+          acc.style.opacity       = p.toFixed(3);
         }
       });
     };
