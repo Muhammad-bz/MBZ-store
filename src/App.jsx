@@ -307,59 +307,42 @@ function CinematicHero({ onNav }) {
 
   // ── Passive scroll listener ──────────────────────────────────────
   useEffect(() => {
-    const SPACER_H = window.innerHeight * 2; // 200vh in px, fixed at mount
-
+    // Container is 300vh. Subtract navbar height (64px) so animation
+    // starts the moment the first pixel scrolls, not after navbar scrolls past.
+    const NAV_H   = 64;
     const onScroll = () => {
-      const scrollY = window.scrollY;
-      progressRef.current = Math.min(1, Math.max(0, scrollY / SPACER_H));
+      const el = containerRef.current;
+      if (!el) return;
+      const total = el.offsetHeight - window.innerHeight - NAV_H;
+      progressRef.current = Math.min(1, Math.max(0, (window.scrollY) / total));
     };
-
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
-    <>
-      {/* Spacer that creates the scroll distance — 200vh of scroll room */}
-      <div ref={containerRef} style={{ height: "200vh", position: "relative", zIndex: 0 }} />
+    <div ref={containerRef} style={{ height: "300vh", position: "relative" }}>
+      <div className="sticky top-0 overflow-hidden" style={{ height: "100vh", fontFamily: FONT_BODY }}>
 
-      {/* Fixed panel — covers full viewport from pixel 0, scrolls away after spacer ends */}
-      <div
-        className="fixed inset-0 overflow-hidden"
-        style={{ zIndex: 5, fontFamily: FONT_BODY, pointerEvents: "none" }}
-      >
-        <canvas
-          ref={canvasRef}
-          className="absolute inset-0"
-          style={{ width: "100%", height: "100%", imageRendering: "auto" }}
-        />
+        <canvas ref={canvasRef} className="absolute inset-0 z-0"
+          style={{ width: "100%", height: "100%", imageRendering: "auto" }} />
 
-        {/* Canvas fade gradient */}
-        <div
-          className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ height: "35%", background: `linear-gradient(to bottom, transparent, ${C.bg})`, zIndex: 2 }}
-        />
+        {/* Bottom fade */}
+        <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
+          style={{ zIndex: 2, height: "35%", background: `linear-gradient(to bottom, transparent, ${C.bg})` }} />
 
         {/* Loading overlay */}
-        <div
-          ref={loadWrapRef}
-          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
-          style={{ background: "rgba(0,0,0,0.88)", pointerEvents: "auto" }}
-        >
-          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase" }}>
-            Loading
-          </p>
+        <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
+          style={{ background: "rgba(0,0,0,0.88)" }}>
+          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase" }}>Loading</p>
           <div style={{ width: 200, height: 2, background: "rgba(255,255,255,0.1)", borderRadius: 2 }}>
-            <div
-              ref={loadBarRef}
-              style={{ height: "100%", width: "0%", background: "#5C3D2A", borderRadius: 2, transition: "width 0.08s linear" }}
-            />
+            <div ref={loadBarRef} style={{ height: "100%", width: "0%", background: "#5C3D2A", borderRadius: 2, transition: "width 0.08s linear" }} />
           </div>
         </div>
 
-        {/* Text */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-12%)", pointerEvents: "auto" }}>
+        {/* Text — centered, nudged down 8% so it sits over the clothes */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(8%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
               <h1 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto" style={{ color: C.maroon }}>
@@ -394,15 +377,13 @@ function CinematicHero({ onNav }) {
 
         {/* Scroll hint */}
         <div ref={hintRef} className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5" style={{ zIndex: 10, opacity: 1 }}>
-          <span style={{ fontSize: 10, letterSpacing: "0.2em", color: C.inkSoft, textTransform: "uppercase", animation: "hintPulse 2s ease-in-out infinite" }}>
-            Scroll slowly
-          </span>
+          <span style={{ fontSize: 10, letterSpacing: "0.2em", color: C.inkSoft, textTransform: "uppercase", animation: "hintPulse 2s ease-in-out infinite" }}>Scroll slowly</span>
           <svg width="16" height="10" viewBox="0 0 16 10" style={{ animation: "hintPulse 2s ease-in-out infinite", color: C.inkSoft }}>
             <path d="M1 1l7 7 7-7" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 
@@ -464,7 +445,7 @@ function TiltCard({ product, onOpen, isWishlisted, onToggleWish }) {
 function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, setQuery }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
-    <header className="fixed top-0 left-0 right-0 z-40" style={{ background: "#5C3D2A" }}>
+    <header className="sticky top-0 z-40" style={{ background: "#5C3D2A" }}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: C.bgSoft }}>MBZ</button>
 
@@ -820,38 +801,36 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 20, background: C.bg, marginTop: "-30vh" }}>
+      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-20vh" }}>
         <CategorySection onNav={onNav} />
-      </div>
 
-      <div style={{ position: "relative", zIndex: 20, background: C.bg }}>
-      <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
-        <div className="flex items-end justify-between mb-6">
-          <h2 className="text-2xl font-black" style={{ color: C.ink }}>Featured</h2>
-          <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
-        </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-          {featured.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} />))}
-        </div>
-      </section>
+        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
+          <div className="flex items-end justify-between mb-6">
+            <h2 className="text-2xl font-black" style={{ color: C.ink }}>Featured</h2>
+            <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+            {featured.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} />))}
+          </div>
+        </section>
 
-      <section style={{ background: C.bgSoft, borderTop: `1px solid ${C.line}` }}>
-        <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12 grid grid-cols-1 sm:grid-cols-3 gap-8">
-          {[
-            { icon: Truck,       title: "Free Shipping",   desc: "On all orders over $75"  },
-            { icon: RotateCcw,   title: "30-Day Returns",  desc: "No questions asked"       },
-            { icon: ShieldCheck, title: "Secure Checkout", desc: "Encrypted end-to-end"     },
-          ].map(({ icon: Icon, title, desc }) => (
-            <div key={title} className="flex items-center gap-4">
-              <Icon size={22} strokeWidth={1.5} style={{ color: "#8a6cf0" }} />
-              <div>
-                <p className="text-sm font-medium" style={{ color: C.ink }}>{title}</p>
-                <p className="text-xs" style={{ color: C.inkSoft, opacity: 0.75 }}>{desc}</p>
+        <section style={{ background: C.bgSoft, borderTop: `1px solid ${C.line}` }}>
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12 grid grid-cols-1 sm:grid-cols-3 gap-8">
+            {[
+              { icon: Truck,       title: "Free Shipping",   desc: "On all orders over $75"  },
+              { icon: RotateCcw,   title: "30-Day Returns",  desc: "No questions asked"       },
+              { icon: ShieldCheck, title: "Secure Checkout", desc: "Encrypted end-to-end"     },
+            ].map(({ icon: Icon, title, desc }) => (
+              <div key={title} className="flex items-center gap-4">
+                <Icon size={22} strokeWidth={1.5} style={{ color: C.inkSoft }} />
+                <div>
+                  <p className="text-sm font-medium" style={{ color: C.ink }}>{title}</p>
+                  <p className="text-xs" style={{ color: C.inkSoft, opacity: 0.75 }}>{desc}</p>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
       </div>
     </div>
   );
