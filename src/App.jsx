@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect, useMemo, useCallback } from "react"
 import {
   ShoppingBag, Search, Heart, X, ChevronLeft,
   Star, Plus, Minus, Check, ArrowRight, Menu, Footprints,
-  Shirt, Watch, Truck, ShieldCheck, RotateCcw, CreditCard
+  Shirt, Glasses, Truck, ShieldCheck, RotateCcw, CreditCard
 } from "lucide-react";
 
 /* ══════════════════════════════════════════════════════════
@@ -38,7 +38,7 @@ function GlobalFonts() {
 const CATEGORY_META = {
   shoes:       { label: "Shoes",       icon: Footprints, hue: 18  },
   apparel:     { label: "Apparel",     icon: Shirt,      hue: 265 },
-  accessories: { label: "Accessories", icon: Watch,      hue: 200 },
+  accessories: { label: "Accessories", icon: Glasses,    hue: 200 },
 };
 
 const PRODUCTS = [
@@ -543,23 +543,232 @@ function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, se
 }
 
 /* ══════════════════════════════════════════════════════════
-   CATEGORY SECTION  —  scroll-triggered directional entrance
-   Mobile:  shoes ← left │ apparel ↑ bottom │ accessories → right (0.55s delay)
-   Desktop: staggered fade-up (directional looks off in a 3-col row)
+   CATEGORY ILLUSTRATIONS  —  bespoke SVG per category
 ══════════════════════════════════════════════════════════ */
+function ShoesIllustration() {
+  // A pair of sneakers — left shoe faces right, right shoe faces left (mirrored), side by side
+  const Shoe = ({ x, flip }) => {
+    const s = flip ? -1 : 1;
+    const ox = flip ? x + 118 : x; // origin x for flip transform
+    return (
+      <g transform={`translate(${ox}, 0) scale(${s}, 1)`}>
+        {/* Outsole */}
+        <rect x="0" y="98" width="118" height="12" rx="3" fill="rgba(251,246,236,0.28)" />
+        {[6,18,30,42,54,66,78,90,104].map(tx => (
+          <rect key={tx} x={tx} y={104} width={7} height={3} rx="1" fill="rgba(46,15,5,0.30)" />
+        ))}
+        {/* Midsole */}
+        <rect x="3" y="87" width="112" height="11" rx="2" fill="rgba(251,246,236,0.18)" />
+        <rect x="3" y="91" width="112" height="3" fill="rgba(251,246,236,0.12)" />
+        {/* Heel block */}
+        <rect x="0" y="50" width="28" height="37" rx="2" fill="rgba(251,246,236,0.28)" />
+        {/* Heel pull tab */}
+        <rect x="8" y="42" width="12" height="12" rx="2" fill="rgba(251,246,236,0.22)" stroke="rgba(251,246,236,0.40)" strokeWidth="1.5" />
+        {/* Ankle collar */}
+        <rect x="26" y="54" width="18" height="18" rx="9" fill="rgba(46,15,5,0.50)" stroke="rgba(251,246,236,0.25)" strokeWidth="1.5" />
+        {/* Main upper */}
+        <rect x="28" y="50" width="80" height="37" rx="2" fill="rgba(251,246,236,0.18)" />
+        {/* Toe cap */}
+        <rect x="104" y="60" width="14" height="27" rx="2" fill="rgba(251,246,236,0.26)" />
+        {/* Tongue */}
+        <rect x="58" y="42" width="18" height="45" rx="2" fill="rgba(251,246,236,0.22)" />
+        <rect x="61" y="50" width="12" height="8" rx="1" fill="rgba(251,246,236,0.15)" stroke="rgba(251,246,236,0.30)" strokeWidth="1" />
+        {/* Lace panels */}
+        <rect x="32" y="50" width="26" height="37" rx="1" fill="rgba(251,246,236,0.07)" />
+        <rect x="76" y="50" width="28" height="37" rx="1" fill="rgba(251,246,236,0.07)" />
+        {/* Eyelets & laces */}
+        {[0,1,2,3].map(i => {
+          const ly = 55 + i * 7;
+          return (
+            <React.Fragment key={i}>
+              <circle cx="42" cy={ly} r="2" fill="rgba(251,246,236,0.55)" />
+              <circle cx="78" cy={ly} r="2" fill="rgba(251,246,236,0.55)" />
+              <line x1="44" y1={ly} x2="76" y2={ly} stroke="rgba(251,246,236,0.28)" strokeWidth="1" />
+            </React.Fragment>
+          );
+        })}
+        {/* Side stripe */}
+        <rect x="28" y="72" width="76" height="4" rx="1" fill="rgba(251,246,236,0.22)" />
+        <rect x="28" y="78" width="76" height="2" rx="1" fill="rgba(251,246,236,0.12)" />
+        {/* Top edge */}
+        <line x1="28" y1="50" x2="108" y2="50" stroke="rgba(251,246,236,0.28)" strokeWidth="1.5" />
+      </g>
+    );
+  };
+
+  return (
+    <svg viewBox="0 0 280 140" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
+      {/* Ground shadow */}
+      <ellipse cx="140" cy="132" rx="120" ry="6" fill="rgba(0,0,0,0.20)" />
+      {/* Left shoe — heel on left, toe points right */}
+      <Shoe x={4} flip={false} />
+      {/* Right shoe — mirrored so toe points left, heel on right */}
+      <Shoe x={158} flip={true} />
+    </svg>
+  );
+}
+
+function ApparelIllustration() {
+  // Shirt (top half) + Pants (bottom half) — side by side flat lay
+  return (
+    <svg viewBox="0 0 280 200" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
+      {/* Ground shadow */}
+      <ellipse cx="140" cy="194" rx="110" ry="5" fill="rgba(0,0,0,0.18)" />
+
+      {/* ══ SHIRT — left side ══ */}
+      {/* Left sleeve */}
+      <rect x="8" y="42" width="22" height="58" rx="3"
+        transform="rotate(-10 19 71)"
+        fill="rgba(251,246,236,0.20)" />
+      <rect x="4" y="88" width="22" height="10" rx="2"
+        transform="rotate(-10 15 93)"
+        fill="rgba(251,246,236,0.32)" stroke="rgba(251,246,236,0.40)" strokeWidth="1" />
+      {/* Right sleeve */}
+      <rect x="108" y="42" width="22" height="58" rx="3"
+        transform="rotate(10 119 71)"
+        fill="rgba(251,246,236,0.20)" />
+      <rect x="112" y="88" width="22" height="10" rx="2"
+        transform="rotate(10 123 93)"
+        fill="rgba(251,246,236,0.32)" stroke="rgba(251,246,236,0.40)" strokeWidth="1" />
+      {/* Shirt body */}
+      <rect x="30" y="40" width="82" height="110" rx="3" fill="rgba(251,246,236,0.18)" />
+      {/* Collar stand */}
+      <rect x="56" y="26" width="30" height="16" rx="2" fill="rgba(251,246,236,0.30)" stroke="rgba(251,246,236,0.40)" strokeWidth="1" />
+      {/* Left collar point */}
+      <rect x="38" y="24" width="24" height="18" rx="2"
+        transform="rotate(-16 50 33)"
+        fill="rgba(251,246,236,0.26)" stroke="rgba(251,246,236,0.38)" strokeWidth="1" />
+      {/* Right collar point */}
+      <rect x="80" y="24" width="24" height="18" rx="2"
+        transform="rotate(16 92 33)"
+        fill="rgba(251,246,236,0.26)" stroke="rgba(251,246,236,0.38)" strokeWidth="1" />
+      {/* Placket */}
+      <rect x="67" y="40" width="10" height="110" fill="rgba(251,246,236,0.10)" />
+      <line x1="67" y1="40" x2="67" y2="150" stroke="rgba(251,246,236,0.22)" strokeWidth="1" />
+      <line x1="77" y1="40" x2="77" y2="150" stroke="rgba(251,246,236,0.22)" strokeWidth="1" />
+      {/* Buttons */}
+      {[52, 68, 84, 100, 116, 132].map(y => (
+        <circle key={y} cx="72" cy={y} r="3" fill="rgba(251,246,236,0.08)" stroke="rgba(251,246,236,0.48)" strokeWidth="1.2" />
+      ))}
+      {/* Chest pocket */}
+      <rect x="38" y="56" width="20" height="18" rx="2" fill="rgba(251,246,236,0.10)" stroke="rgba(251,246,236,0.30)" strokeWidth="1" />
+      <line x1="38" y1="64" x2="58" y2="64" stroke="rgba(251,246,236,0.28)" strokeWidth="1" />
+      {/* Shoulder seams */}
+      <line x1="30" y1="40" x2="56" y2="40" stroke="rgba(251,246,236,0.35)" strokeWidth="1.5" />
+      <line x1="86" y1="40" x2="112" y2="40" stroke="rgba(251,246,236,0.35)" strokeWidth="1.5" />
+      {/* Hem */}
+      <line x1="30" y1="146" x2="112" y2="146" stroke="rgba(251,246,236,0.28)" strokeWidth="1.5" />
+
+      {/* ══ PANTS — right side ══ */}
+      {/* Waistband */}
+      <rect x="152" y="28" width="110" height="18" rx="3" fill="rgba(251,246,236,0.30)" stroke="rgba(251,246,236,0.45)" strokeWidth="1.5" />
+      {/* Belt loops */}
+      {[164, 184, 207, 227, 247].map(x => (
+        <rect key={x} x={x} y="24" width="6" height="10" rx="1.5" fill="rgba(251,246,236,0.40)" stroke="rgba(251,246,236,0.50)" strokeWidth="1" />
+      ))}
+      {/* Fly / center seam */}
+      <line x1="207" y1="46" x2="207" y2="70" stroke="rgba(251,246,236,0.30)" strokeWidth="1.2" strokeDasharray="3 2" />
+      {/* Button */}
+      <circle cx="207" cy="34" r="3.5" fill="rgba(251,246,236,0.12)" stroke="rgba(251,246,236,0.50)" strokeWidth="1.2" />
+      {/* Main trouser body */}
+      <rect x="152" y="46" width="110" height="90" rx="2" fill="rgba(251,246,236,0.16)" />
+      {/* Center crotch seam */}
+      <line x1="207" y1="70" x2="207" y2="136" stroke="rgba(251,246,236,0.25)" strokeWidth="1.5" />
+      {/* Left leg */}
+      <rect x="152" y="136" width="52" height="44" rx="4" fill="rgba(251,246,236,0.20)" />
+      {/* Right leg */}
+      <rect x="210" y="136" width="52" height="44" rx="4" fill="rgba(251,246,236,0.20)" />
+      {/* Left cuff */}
+      <rect x="152" y="170" width="52" height="10" rx="2" fill="rgba(251,246,236,0.30)" stroke="rgba(251,246,236,0.38)" strokeWidth="1" />
+      {/* Right cuff */}
+      <rect x="210" y="170" width="52" height="10" rx="2" fill="rgba(251,246,236,0.30)" stroke="rgba(251,246,236,0.38)" strokeWidth="1" />
+      {/* Pocket left */}
+      <path d="M158 50 Q158 74 174 76 L174 50" stroke="rgba(251,246,236,0.28)" strokeWidth="1" fill="rgba(251,246,236,0.06)" />
+      {/* Pocket right */}
+      <path d="M256 50 Q256 74 240 76 L240 50" stroke="rgba(251,246,236,0.28)" strokeWidth="1" fill="rgba(251,246,236,0.06)" />
+      {/* Crease lines on legs */}
+      <line x1="178" y1="136" x2="178" y2="176" stroke="rgba(251,246,236,0.18)" strokeWidth="1" />
+      <line x1="236" y1="136" x2="236" y2="176" stroke="rgba(251,246,236,0.18)" strokeWidth="1" />
+    </svg>
+  );
+}
+
+function SunglassesIllustration() {
+  return (
+    <svg viewBox="0 0 280 160" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ width: "100%", height: "100%" }}>
+      {/* Ground shadow */}
+      <ellipse cx="140" cy="148" rx="100" ry="7" fill="rgba(0,0,0,0.18)" />
+
+      {/* ── LEFT TEMPLE ARM — extends left ── */}
+      <rect x="8" y="68" width="52" height="10" rx="5"
+        transform="rotate(-4 8 73)"
+        fill="rgba(251,246,236,0.28)" stroke="rgba(251,246,236,0.40)" strokeWidth="1" />
+      {/* Left temple tip */}
+      <rect x="6" y="70" width="14" height="7" rx="3"
+        transform="rotate(-4 6 73)"
+        fill="rgba(251,246,236,0.18)" />
+
+      {/* ── RIGHT TEMPLE ARM — extends right ── */}
+      <rect x="220" y="68" width="52" height="10" rx="5"
+        transform="rotate(4 272 73)"
+        fill="rgba(251,246,236,0.28)" stroke="rgba(251,246,236,0.40)" strokeWidth="1" />
+      {/* Right temple tip */}
+      <rect x="260" y="70" width="14" height="7" rx="3"
+        transform="rotate(4 267 73)"
+        fill="rgba(251,246,236,0.18)" />
+
+      {/* ── LEFT LENS FRAME — large rounded rect ── */}
+      <rect x="28" y="42" width="96" height="72" rx="22"
+        fill="rgba(46,15,5,0.55)" stroke="rgba(251,246,236,0.40)" strokeWidth="2.5" />
+      {/* Left lens tint / glare */}
+      <rect x="34" y="48" width="84" height="60" rx="18"
+        fill="rgba(21,194,201,0.08)" />
+      {/* Left lens highlight */}
+      <line x1="42" y1="55" x2="72" y2="55" stroke="rgba(251,246,236,0.18)" strokeWidth="2" strokeLinecap="round" />
+      <line x1="42" y1="62" x2="58" y2="62" stroke="rgba(251,246,236,0.10)" strokeWidth="1.5" strokeLinecap="round" />
+
+      {/* ── BRIDGE — connects the two lenses ── */}
+      <path d="M124 73 Q140 58 156 73" stroke="rgba(251,246,236,0.55)" strokeWidth="3" fill="none" strokeLinecap="round" />
+      {/* Bridge nose pads */}
+      <circle cx="126" cy="74" r="3.5" fill="rgba(251,246,236,0.22)" stroke="rgba(251,246,236,0.40)" strokeWidth="1" />
+      <circle cx="154" cy="74" r="3.5" fill="rgba(251,246,236,0.22)" stroke="rgba(251,246,236,0.40)" strokeWidth="1" />
+
+      {/* ── RIGHT LENS FRAME ── */}
+      <rect x="156" y="42" width="96" height="72" rx="22"
+        fill="rgba(46,15,5,0.55)" stroke="rgba(251,246,236,0.40)" strokeWidth="2.5" />
+      {/* Right lens tint */}
+      <rect x="162" y="48" width="84" height="60" rx="18"
+        fill="rgba(21,194,201,0.08)" />
+      {/* Right lens highlight */}
+      <line x1="170" y1="55" x2="200" y2="55" stroke="rgba(251,246,236,0.18)" strokeWidth="2" strokeLinecap="round" />
+      <line x1="170" y1="62" x2="186" y2="62" stroke="rgba(251,246,236,0.10)" strokeWidth="1.5" strokeLinecap="round" />
+
+      {/* ── HINGE left ── */}
+      <rect x="120" y="67" width="8" height="16" rx="3" fill="rgba(251,246,236,0.35)" stroke="rgba(251,246,236,0.50)" strokeWidth="1" />
+      {/* ── HINGE right ── */}
+      <rect x="152" y="67" width="8" height="16" rx="3" fill="rgba(251,246,236,0.35)" stroke="rgba(251,246,236,0.50)" strokeWidth="1" />
+    </svg>
+  );
+}
+
 /* ══════════════════════════════════════════════════════════
    CATEGORY SECTION  —  scroll-progress-driven, per-card tracking
    Mobile:  each card tracks its own viewport entry individually
             shoes ← left | apparel ↑ bottom | accessories → right
    Desktop: section-level trigger, staggered fade-up
 ══════════════════════════════════════════════════════════ */
+const CATEGORY_CARDS = {
+  accessories: { label: "Accessories Collection", tag: "The Detail",    img: "/Accessories_Collection_Panel.png", accent: "#C8A882" },
+  apparel:     { label: "Clothing Collection",    tag: "The Detail",    img: "/Clothing_Collection_Panel.png",    accent: "#C8A882" },
+  shoes:       { label: "Footwear Collection",    tag: "The Detail",    img: "/Shoes_Collection_Panel.png",       accent: "#C8A882" },
+};
+
 function CategorySection({ onNav }) {
   const sectionRef = useRef(null);
   const cardRefs   = useRef([]);
   const rafRef     = useRef(null);
 
   useEffect(() => {
-    // easeOutCubic — snappy in, soft landing
     const ease = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
     const onScroll = () => {
@@ -567,48 +776,35 @@ function CategorySection({ onNav }) {
       rafRef.current = requestAnimationFrame(() => {
         const vh = window.innerHeight;
         const isMobile = window.innerWidth < 640;
-        const [shoes, apparel, acc] = cardRefs.current;
-        if (!shoes || !apparel || !acc) return;
+        const [acc, apparel, shoes] = cardRefs.current;
+        if (!acc || !apparel || !shoes) return;
 
         if (isMobile) {
-          // Each card uses its OWN bounding rect so stacked cards
-          // don't all complete their animation simultaneously
           const cp = (el) => {
             const { top } = el.getBoundingClientRect();
-            // 0 = card top at viewport bottom (just entering)
-            // 1 = card top is 35% down from viewport top (settled)
             return ease((vh - top) / (vh * 0.65));
           };
-          const p0 = cp(shoes);
-          const p1 = cp(apparel);
-          const p2 = cp(acc);
-
-          shoes.style.transform   = `translateX(${(1 - p0) * -110}%)`;
-          shoes.style.opacity     = p0.toFixed(3);
+          const p0 = cp(acc), p1 = cp(apparel), p2 = cp(shoes);
+          acc.style.transform     = `translateX(${(1 - p0) * -110}%)`;
+          acc.style.opacity       = p0.toFixed(3);
           apparel.style.transform = `translateY(${(1 - p1) * 80}%)`;
           apparel.style.opacity   = p1.toFixed(3);
-          acc.style.transform     = `translateX(${(1 - p2) * 110}%)`;
-          acc.style.opacity       = p2.toFixed(3);
+          shoes.style.transform   = `translateX(${(1 - p2) * 110}%)`;
+          shoes.style.opacity     = p2.toFixed(3);
         } else {
-          // Desktop: all three trigger simultaneously with same progress
           const { top } = sectionRef.current.getBoundingClientRect();
           const p = ease((vh - top) / (vh * 0.6));
-
-          shoes.style.transform   = `translateX(${(1 - p) * -110}%)`;
-          shoes.style.opacity     = p.toFixed(3);
+          acc.style.transform     = `translateX(${(1 - p) * -110}%)`;
+          acc.style.opacity       = p.toFixed(3);
           apparel.style.transform = `translateY(${(1 - p) * 80}%)`;
           apparel.style.opacity   = p.toFixed(3);
-          acc.style.transform     = `translateX(${(1 - p) * 110}%)`;
-          acc.style.opacity       = p.toFixed(3);
+          shoes.style.transform   = `translateX(${(1 - p) * 110}%)`;
+          shoes.style.opacity     = p.toFixed(3);
         }
       });
     };
 
-    // Start fully hidden
-    cardRefs.current.forEach((el) => {
-      if (el) { el.style.opacity = "0"; }
-    });
-
+    cardRefs.current.forEach((el) => { if (el) el.style.opacity = "0"; });
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
     onScroll();
@@ -623,28 +819,21 @@ function CategorySection({ onNav }) {
     <div style={{ overflow: "hidden" }}>
       <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {Object.entries(CATEGORY_META).map(([key, meta], i) => {
-            const Icon = meta.icon;
+          {Object.entries(CATEGORY_CARDS).map(([key, card], i) => {
+            const { label, img } = card;
             return (
               <button
                 key={key}
                 ref={(el) => { cardRefs.current[i] = el; }}
                 onClick={() => onNav("category", key)}
-                className="group relative h-56 rounded-2xl overflow-hidden text-left"
+                className="group relative h-64 rounded-2xl overflow-hidden text-left"
                 style={{ opacity: 0, willChange: "transform, opacity" }}
               >
-                <div
-                  className="absolute inset-0 transition-transform duration-500 group-hover:scale-110"
-                  style={{ background: `radial-gradient(circle at 70% 30%, hsl(${meta.hue} 80% 58%), hsl(${meta.hue} 55% 18%))` }}
+                <img
+                  src={img}
+                  alt={label}
+                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
                 />
-                <div className="absolute inset-0 bg-black/15 group-hover:bg-black/5 transition-colors" />
-                <div className="relative z-10 h-full flex flex-col justify-between p-6">
-                  <Icon size={28} className="text-white/90" strokeWidth={1.25} />
-                  <div className="flex items-center justify-between">
-                    <span className="text-white text-lg font-semibold">{meta.label}</span>
-                    <ArrowRight size={18} className="text-white/70 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
               </button>
             );
           })}
