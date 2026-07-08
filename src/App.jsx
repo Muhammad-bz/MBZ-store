@@ -160,7 +160,8 @@ function drawImageCover(ctx, img, W, H) {
   if (!img || !img.naturalWidth) return;
   const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
   const dx    = (W - img.naturalWidth  * scale) / 2;
-  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.08;
+  // Shift image up 8% for composition, then clip 6% extra from bottom to hide watermark
+  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.08 - H * 0.06;
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
 }
 
@@ -341,8 +342,8 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — nudged down slightly so buttons sit over the cloth pile */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(2%)" }}>
+        {/* Text — tiny lift so it sits just above the cloth pile */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-1%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
               <h1 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto" style={{ color: C.maroon }}>
@@ -793,14 +794,14 @@ function CategorySection({ onNav }) {
                 key={key}
                 ref={(el) => { cardRefs.current[i] = el; }}
                 onClick={() => onNav("category", key)}
-                className="group relative h-64 rounded-2xl overflow-hidden text-left"
+                className="group relative h-80 rounded-2xl overflow-hidden text-left"
                 style={{ opacity: 0, background: "#5C3D2A" }}
               >
                 <div className="absolute inset-0 rounded-2xl overflow-hidden">
                   <img
                     src={img}
                     alt={label}
-                    className="w-full h-full object-cover scale-[1.08] transition-transform duration-500 group-hover:scale-[1.13]"
+                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
                   />
                 </div>
               </button>
