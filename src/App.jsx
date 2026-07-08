@@ -334,11 +334,11 @@ function CinematicHero({ onNav }) {
         className="sticky top-0 h-screen overflow-hidden"
         style={{ background: "transparent", fontFamily: FONT_BODY }}
       >
-        {/* Canvas — full screen, holds last frame permanently */}
+        {/* Canvas — shifted up to crop empty top space, bottom naturally cropped */}
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 z-0"
-          style={{ width: "100%", height: "100%", imageRendering: "auto" }}
+          className="absolute inset-x-0 z-0"
+          style={{ width: "100%", height: "100%", top: "-18%", imageRendering: "auto" }}
         />
 
         {/* Bottom fade — blends video into page background seamlessly */}
