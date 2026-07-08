@@ -116,8 +116,8 @@ const FRAME_PATH = (n, mobile) => {
   const t  = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(3);
   const id = mobile ? MOBILE_ID : DESKTOP_ID;
   const tr = mobile
-    ? "w_1080,h_1920,c_fill,g_center,z_1.6,q_auto:best"
-    : "w_1920,h_1080,c_fill,g_center,z_1.8,q_auto:best";
+    ? "w_1080,h_1920,c_fill,g_center,z_1.6,e_brightness:25,q_auto:best"
+    : "w_1920,h_1080,c_fill,g_center,z_1.8,e_brightness:25,q_auto:best";
   return `${CLOUDINARY_BASE}/${tr}/so_${t}/${id}.jpg`;
 };
 
@@ -330,26 +330,13 @@ function CinematicHero({ onNav }) {
     <div ref={containerRef} style={{ height: "300vh", position: "relative" }}>
       <div
         className="sticky top-0 h-screen overflow-hidden"
-        style={{ background: `linear-gradient(180deg, ${C.bgSoft} 0%, ${C.bg} 100%)`, fontFamily: FONT_BODY }}
+        style={{ background: "transparent", fontFamily: FONT_BODY }}
       >
-        {/* Accent bar */}
-        <div className="absolute top-0 left-0 w-full h-[6px] z-30" style={{ background: ACCENT_BAR }} />
-
         {/* Canvas — full screen, holds last frame permanently */}
         <canvas
           ref={canvasRef}
           className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", opacity: 1, imageRendering: "auto" }}
-        />
-
-        {/* Dark vignette overlay for text legibility
-            FIX: zIndex via inline style — z-1 is not a valid Tailwind class */}
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            zIndex:     1,
-            background: "linear-gradient(135deg, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.18) 50%, transparent 100%)",
-          }}
         />
 
         {/* Loading overlay */}
@@ -378,7 +365,7 @@ function CinematicHero({ onNav }) {
             >
               <h1
                 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto"
-                style={{ color: C.maroon }}
+                style={{ color: "#F4E8C8" }}
               >
                 {SCENES[0].lines.map((line, i) => {
                   const isAccent = line === "Motion.";
@@ -387,7 +374,7 @@ function CinematicHero({ onNav }) {
                       key={i}
                       className="block"
                       style={isAccent
-                        ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: C.maroon }
+                        ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: "#C8A882" }
                         : undefined}
                     >
                       {line}
@@ -397,7 +384,7 @@ function CinematicHero({ onNav }) {
               </h1>
               <p
                 className="mt-3 max-w-md mx-auto text-xs sm:text-sm font-medium"
-                style={{ color: C.inkSoft }}
+                style={{ color: "rgba(244,232,200,0.75)" }}
               >
                 {SCENES[0].sub}
               </p>
@@ -405,14 +392,14 @@ function CinematicHero({ onNav }) {
                 <button
                   onClick={() => onNav("category", "shoes")}
                   className="px-5 py-2.5 rounded-full text-xs font-medium flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
-                  style={{ background: C.maroon, color: C.bgSoft }}
+                  style={{ background: "#C8A882", color: "#2E0F05" }}
                 >
                   Order Now <ArrowRight size={16} />
                 </button>
                 <button
                   onClick={() => onNav("category", "apparel")}
                   className="px-5 py-2.5 rounded-full text-xs font-medium border"
-                  style={{ borderColor: C.maroon, color: C.maroon }}
+                  style={{ borderColor: "rgba(244,232,200,0.6)", color: "#F4E8C8" }}
                 >
                   Explore Apparel
                 </button>
@@ -427,10 +414,10 @@ function CinematicHero({ onNav }) {
           className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5"
           style={{ zIndex: 10, opacity: 1 }}
         >
-          <span style={{ fontSize: 10, letterSpacing: "0.2em", color: C.inkSoft, textTransform: "uppercase", animation: "hintPulse 2s ease-in-out infinite" }}>
+          <span style={{ fontSize: 10, letterSpacing: "0.2em", color: "rgba(244,232,200,0.6)", textTransform: "uppercase", animation: "hintPulse 2s ease-in-out infinite" }}>
             Scroll slowly
           </span>
-          <svg width="16" height="10" viewBox="0 0 16 10" style={{ animation: "hintPulse 2s ease-in-out infinite", color: C.inkSoft }}>
+          <svg width="16" height="10" viewBox="0 0 16 10" style={{ animation: "hintPulse 2s ease-in-out infinite", color: "rgba(244,232,200,0.6)" }}>
             <path d="M1 1l7 7 7-7" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
@@ -497,7 +484,7 @@ function TiltCard({ product, onOpen, isWishlisted, onToggleWish }) {
 function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, setQuery }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-40" style={{ background: C.maroon }}>
+    <header className="sticky top-0 z-40" style={{ background: "#5C3D2A" }}>
       <div className="h-[3px]" style={{ background: ACCENT_BAR }} />
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: C.bgSoft }}>MBZ</button>
@@ -523,7 +510,7 @@ function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, se
       </div>
 
       {searchOpen && (
-        <div className="border-t px-5 sm:px-8 py-3" style={{ borderColor: "rgba(251,246,236,0.15)", background: C.maroonDeep }}>
+        <div className="border-t px-5 sm:px-8 py-3" style={{ borderColor: "rgba(251,246,236,0.15)", background: "#3D2518" }}>
           <div className="max-w-7xl mx-auto flex items-center gap-2">
             <Search size={16} style={{ color: "rgba(251,246,236,0.5)" }} />
             <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products..." className="bg-transparent outline-none text-sm w-full" style={{ color: C.bgSoft }} />
@@ -532,7 +519,7 @@ function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, se
       )}
 
       {mobileOpen && (
-        <div className="md:hidden border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "rgba(251,246,236,0.15)", background: C.maroonDeep }}>
+        <div className="md:hidden border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "rgba(251,246,236,0.15)", background: "#3D2518" }}>
           {Object.entries(CATEGORY_META).map(([key, meta]) => (
             <button key={key} onClick={() => { onNav("category", key); setMobileOpen(false); }} className="text-left text-sm" style={{ color: "rgba(251,246,236,0.85)" }}>{meta.label}</button>
           ))}
@@ -827,13 +814,15 @@ function CategorySection({ onNav }) {
                 ref={(el) => { cardRefs.current[i] = el; }}
                 onClick={() => onNav("category", key)}
                 className="group relative h-64 rounded-2xl overflow-hidden text-left"
-                style={{ opacity: 0, willChange: "transform, opacity" }}
+                style={{ opacity: 0, willChange: "transform, opacity", background: "#5C3D2A" }}
               >
-                <img
-                  src={img}
-                  alt={label}
-                  className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                />
+                <div className="absolute inset-0 rounded-2xl overflow-hidden">
+                  <img
+                    src={img}
+                    alt={label}
+                    className="w-full h-full object-cover scale-[1.08] transition-transform duration-500 group-hover:scale-[1.13]"
+                  />
+                </div>
               </button>
             );
           })}
