@@ -115,10 +115,12 @@ const FRAME_COUNT     = 120; // ↑ from 90 — noticeably smoother inter-frame 
 const FRAME_PATH = (n, mobile) => {
   const t  = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(3);
   const id = mobile ? MOBILE_ID : DESKTOP_ID;
-  const tr = mobile
-    ? "w_1080,h_1920,c_fill,g_center,e_brightness:8,q_auto:best"
-    : "w_1920,h_1080,c_fill,g_center,e_brightness:8,q_auto:best";
-  return `${CLOUDINARY_BASE}/${tr}/so_${t}/${id}.jpg`;
+  // Step 1: crop bottom 12% to remove Kling watermark
+  // Step 2: scale to fill target dimensions + brightness
+  const crop = mobile
+    ? "w_1080,h_1693,c_crop,g_north/w_1080,h_1920,c_fill,e_brightness:8,q_auto:best"
+    : "w_1920,h_950,c_crop,g_north/w_1920,h_1080,c_fill,e_brightness:8,q_auto:best";
+  return `${CLOUDINARY_BASE}/${crop}/so_${t}/${id}.jpg`;
 };
 
 // Preload all frames — captures mobile flag ONCE, 12 s safety fallback
@@ -286,12 +288,12 @@ function CinematicHero({ onNav }) {
           ctx.globalAlpha = 1;
         }
 
-        // Draw bottom fade gradient directly on canvas — guarantees perfect blend with page bg
-        const grad = ctx.createLinearGradient(0, H * 0.52, 0, H);
+        // Draw bottom fade gradient directly on canvas — pixel-perfect blend with page bg
+        const grad = ctx.createLinearGradient(0, H * 0.45, 0, H);
         grad.addColorStop(0, "rgba(244,236,224,0)");
         grad.addColorStop(1, "rgba(244,236,224,1)");
         ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, W, H);
+        ctx.fillRect(0, H * 0.45, W, H);
 
         // Canvas stays at opacity 1 — last frame holds permanently
       }
@@ -317,36 +319,36 @@ function CinematicHero({ onNav }) {
 
   // ── Passive scroll listener ──────────────────────────────────────
   useEffect(() => {
-    let cachedOffsetTop = 0;
+    // Capture once after layout — avoids Chrome URL-bar jumping
+    // getBoundingClientRect().top + scrollY gives absolute page offset
+    let pageTop   = 0;
+    let pageTotal = 0;
 
     const measure = () => {
-      if (containerRef.current) {
-        // Walk up the DOM to get true offsetTop from document root
-        let top = 0;
-        let el  = containerRef.current;
-        while (el) { top += el.offsetTop; el = el.offsetParent; }
-        cachedOffsetTop = top;
-      }
+      const el = containerRef.current;
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      pageTop   = rect.top + window.scrollY;
+      pageTotal = el.offsetHeight - window.innerHeight;
     };
 
     const onScroll = () => {
-      const el = containerRef.current;
-      if (!el) return;
-      const total   = el.offsetHeight - window.innerHeight;
-      const scrolled = window.scrollY - cachedOffsetTop;
-      progressRef.current = total > 0 ? Math.min(1, Math.max(0, scrolled / total)) : 0;
+      if (pageTotal <= 0) return;
+      progressRef.current = Math.min(1, Math.max(0, (window.scrollY - pageTop) / pageTotal));
     };
 
-    // Measure after paint, then on every resize (catches Chrome URL bar collapse)
-    requestAnimationFrame(() => { measure(); onScroll(); });
-
-    const ro = new ResizeObserver(() => { measure(); onScroll(); });
-    ro.observe(document.documentElement);
+    // Wait two frames for layout to fully settle (fonts, images, navbar)
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      measure();
+      onScroll();
+    }));
 
     window.addEventListener("scroll", onScroll, { passive: true });
+    // Re-measure only on true resize (orientation change), not URL bar hide/show
+    window.addEventListener("resize", () => { measure(); onScroll(); }, { passive: true });
+
     return () => {
       window.removeEventListener("scroll", onScroll);
-      ro.disconnect();
     };
   }, []);
 
@@ -354,10 +356,10 @@ function CinematicHero({ onNav }) {
     // 300 vh → 100 vh viewport + 200 vh of scroll room
     // Previously 180 vh gave only 80 vh of actual scrub room —
     // users blew through the full video in ~2 seconds at normal speed.
-    <div ref={containerRef} style={{ height: "300vh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "300dvh", position: "relative" }}>
       <div
-        className="sticky top-0 h-screen overflow-hidden"
-        style={{ background: "transparent", fontFamily: FONT_BODY }}
+        className="sticky top-0 overflow-hidden"
+        style={{ height: "100dvh", background: "transparent", fontFamily: FONT_BODY }}
       >
         {/* Canvas — image shifted up inside drawImageCover */}
         <canvas
