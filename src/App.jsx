@@ -115,10 +115,9 @@ const FRAME_COUNT     = 120; // ↑ from 90 — noticeably smoother inter-frame 
 const FRAME_PATH = (n, mobile) => {
   const t  = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(3);
   const id = mobile ? MOBILE_ID : DESKTOP_ID;
-  // Crop bottom 12% to remove watermark, no rescaling (no zoom)
   const tr = mobile
-    ? "w_1080,h_1690,c_crop,g_north,e_brightness:8,q_auto:best"
-    : "w_1920,h_950,c_crop,g_north,e_brightness:8,q_auto:best";
+    ? "w_1080,h_1920,c_fill,g_center,e_brightness:8,q_auto:best"
+    : "w_1920,h_1080,c_fill,g_center,e_brightness:8,q_auto:best";
   return `${CLOUDINARY_BASE}/${tr}/so_${t}/${id}.jpg`;
 };
 
@@ -156,14 +155,12 @@ function preloadFrames(onProgress) {
   });
 }
 
-// object-fit: cover math for canvas, shifted up to crop watermark at bottom
+// object-fit: cover — shifts image up 15% to push watermark below canvas edge
 function drawImageCover(ctx, img, W, H) {
   if (!img || !img.naturalWidth) return;
-  const scale  = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-  const dx     = (W - img.naturalWidth  * scale) / 2;
-  const dyBase = (H - img.naturalHeight * scale) / 2;
-  // Shift image up by 18% of canvas height — crops bottom (watermark) and removes top empty space
-  const dy     = dyBase - H * 0.18;
+  const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+  const dx    = (W - img.naturalWidth  * scale) / 2;
+  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.15;
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
 }
 
@@ -286,14 +283,6 @@ function CinematicHero({ onNav }) {
           drawImageCover(ctx, frames[hiIdx], W, H);
           ctx.globalAlpha = 1;
         }
-
-        // Draw bottom fade gradient directly on canvas — pixel-perfect blend with page bg
-        const grad = ctx.createLinearGradient(0, H * 0.45, 0, H);
-        grad.addColorStop(0, "rgba(244,236,224,0)");
-        grad.addColorStop(1, "rgba(244,236,224,1)");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, H * 0.45, W, H);
-
         // Canvas stays at opacity 1 — last frame holds permanently
       }
 
@@ -318,54 +307,45 @@ function CinematicHero({ onNav }) {
 
   // ── Passive scroll listener ──────────────────────────────────────
   useEffect(() => {
-    // Hero is always the first element — scrollY 0 = start of animation
-    // pageTop is always 0; pageTotal is container height minus viewport height
-    let pageTotal = 0;
-
-    const measure = () => {
-      const el = containerRef.current;
-      if (!el) return;
-      pageTotal = el.getBoundingClientRect().height - window.innerHeight;
-    };
+    const SPACER_H = window.innerHeight * 2; // 200vh in px, fixed at mount
 
     const onScroll = () => {
-      if (pageTotal <= 0) return;
-      progressRef.current = Math.min(1, Math.max(0, window.scrollY / pageTotal));
+      const scrollY = window.scrollY;
+      progressRef.current = Math.min(1, Math.max(0, scrollY / SPACER_H));
     };
 
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      measure();
-      onScroll();
-    }));
-
+    onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    const mq = window.matchMedia("(orientation: landscape)");
-    mq.addEventListener("change", () => { measure(); onScroll(); });
-
-    return () => { window.removeEventListener("scroll", onScroll); };
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
-    // 300 vh → 100 vh viewport + 200 vh of scroll room
-    // Previously 180 vh gave only 80 vh of actual scrub room —
-    // users blew through the full video in ~2 seconds at normal speed.
-    <div ref={containerRef} style={{ height: "300vh", position: "relative" }}>
+    <>
+      {/* Spacer that creates the scroll distance — 200vh of scroll room */}
+      <div ref={containerRef} style={{ height: "200vh", position: "relative", zIndex: 0 }} />
+
+      {/* Fixed panel — covers full viewport from pixel 0, scrolls away after spacer ends */}
       <div
-        className="sticky top-0 overflow-hidden"
-        style={{ height: "100vh", background: "transparent", fontFamily: FONT_BODY }}
+        className="fixed inset-0 overflow-hidden"
+        style={{ zIndex: 5, fontFamily: FONT_BODY, pointerEvents: "none" }}
       >
-        {/* Canvas — image shifted up inside drawImageCover */}
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 z-0"
+          className="absolute inset-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }}
+        />
+
+        {/* Canvas fade gradient */}
+        <div
+          className="absolute bottom-0 left-0 right-0 pointer-events-none"
+          style={{ height: "35%", background: `linear-gradient(to bottom, transparent, ${C.bg})`, zIndex: 2 }}
         />
 
         {/* Loading overlay */}
         <div
           ref={loadWrapRef}
           className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
-          style={{ background: "rgba(0,0,0,0.88)" }}
+          style={{ background: "rgba(0,0,0,0.88)", pointerEvents: "auto" }}
         >
           <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 11, letterSpacing: "0.2em", textTransform: "uppercase" }}>
             Loading
@@ -378,51 +358,33 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — fades in when video ends */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-12%)" }}>
+        {/* Text */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-12%)", pointerEvents: "auto" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
-            <div
-              ref={textWrapRef}
-              style={{ opacity: 0, willChange: "opacity, transform" }}
-            >
-              <h1
-                className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto"
-                style={{ color: C.maroon }}
-              >
+            <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
+              <h1 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto" style={{ color: C.maroon }}>
                 {SCENES[0].lines.map((line, i) => {
                   const isAccent = line === "Motion.";
                   return (
-                    <span
-                      key={i}
-                      className="block"
-                      style={isAccent
-                        ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: C.inkSoft }
-                        : undefined}
-                    >
+                    <span key={i} className="block"
+                      style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: C.inkSoft } : undefined}>
                       {line}
                     </span>
                   );
                 })}
               </h1>
-              <p
-                className="mt-3 max-w-md mx-auto text-xs sm:text-sm font-medium"
-                style={{ color: C.inkSoft }}
-              >
+              <p className="mt-3 max-w-md mx-auto text-xs sm:text-sm font-medium" style={{ color: C.inkSoft }}>
                 {SCENES[0].sub}
               </p>
               <div className="mt-4 flex flex-row items-center justify-center gap-3">
-                <button
-                  onClick={() => onNav("category", "shoes")}
+                <button onClick={() => onNav("category", "shoes")}
                   className="px-5 py-2.5 rounded-full text-xs font-medium flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
-                  style={{ background: "#5C3D2A", color: C.bgSoft }}
-                >
+                  style={{ background: "#5C3D2A", color: C.bgSoft }}>
                   Order Now <ArrowRight size={16} />
                 </button>
-                <button
-                  onClick={() => onNav("category", "apparel")}
+                <button onClick={() => onNav("category", "apparel")}
                   className="px-5 py-2.5 rounded-full text-xs font-medium border"
-                  style={{ borderColor: C.maroon, color: C.maroon }}
-                >
+                  style={{ borderColor: C.maroon, color: C.maroon }}>
                   Explore Apparel
                 </button>
               </div>
@@ -430,12 +392,8 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Scroll hint — pulses until text appears, then fades out */}
-        <div
-          ref={hintRef}
-          className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5"
-          style={{ zIndex: 10, opacity: 1 }}
-        >
+        {/* Scroll hint */}
+        <div ref={hintRef} className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5" style={{ zIndex: 10, opacity: 1 }}>
           <span style={{ fontSize: 10, letterSpacing: "0.2em", color: C.inkSoft, textTransform: "uppercase", animation: "hintPulse 2s ease-in-out infinite" }}>
             Scroll slowly
           </span>
@@ -444,7 +402,7 @@ function CinematicHero({ onNav }) {
           </svg>
         </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -862,10 +820,11 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ marginTop: "-40vh", position: "relative", zIndex: 10 }}>
+      <div style={{ position: "relative", zIndex: 20, background: C.bg, marginTop: "-30vh" }}>
         <CategorySection onNav={onNav} />
       </div>
 
+      <div style={{ position: "relative", zIndex: 20, background: C.bg }}>
       <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
         <div className="flex items-end justify-between mb-6">
           <h2 className="text-2xl font-black" style={{ color: C.ink }}>Featured</h2>
@@ -893,6 +852,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
           ))}
         </div>
       </section>
+      </div>
     </div>
   );
 }
@@ -1262,7 +1222,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen font-sans" style={{ background: C.bg, color: C.ink, fontFamily: FONT_BODY, paddingTop: "64px" }}>
+    <div className="min-h-screen font-sans" style={{ background: C.bg, color: C.ink, fontFamily: FONT_BODY }}>
       <GlobalFonts />
       <Navbar cartCount={cartCount} onNav={handleNav} onCart={() => setCartOpen(true)} searchOpen={searchOpen} setSearchOpen={setSearchOpen} query={query} setQuery={setQuery} />
 
