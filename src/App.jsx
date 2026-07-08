@@ -155,12 +155,14 @@ function preloadFrames(onProgress) {
   });
 }
 
-// object-fit: cover math for canvas
+// object-fit: cover math for canvas, shifted up to crop watermark at bottom
 function drawImageCover(ctx, img, W, H) {
   if (!img || !img.naturalWidth) return;
-  const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
-  const dx    = (W - img.naturalWidth  * scale) / 2;
-  const dy    = (H - img.naturalHeight * scale) / 2;
+  const scale  = Math.max(W / img.naturalWidth, H / img.naturalHeight);
+  const dx     = (W - img.naturalWidth  * scale) / 2;
+  const dyBase = (H - img.naturalHeight * scale) / 2;
+  // Shift image up by 18% of canvas height — crops bottom (watermark) and removes top empty space
+  const dy     = dyBase - H * 0.18;
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
 }
 
@@ -307,20 +309,29 @@ function CinematicHero({ onNav }) {
 
   // ── Passive scroll listener ──────────────────────────────────────
   useEffect(() => {
+    let offsetTop = 0;
+
+    const measure = () => {
+      if (containerRef.current) offsetTop = containerRef.current.offsetTop;
+    };
+
+    // Measure after first paint so navbar height is settled
+    requestAnimationFrame(() => { measure(); });
+    window.addEventListener("resize", measure, { passive: true });
+
     const onScroll = () => {
       const el = containerRef.current;
       if (!el) return;
-      const offsetTop = el.offsetTop;
-      const total     = el.offsetHeight - window.innerHeight;
-      const scrolled  = window.scrollY - offsetTop;
+      const total   = el.offsetHeight - window.innerHeight;
+      const scrolled = window.scrollY - offsetTop;
       progressRef.current = total > 0 ? Math.min(1, Math.max(0, scrolled / total)) : 0;
     };
+
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("resize", onScroll, { passive: true });
     return () => {
       window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("resize", onScroll);
+      window.removeEventListener("resize", measure);
     };
   }, []);
 
@@ -333,20 +344,20 @@ function CinematicHero({ onNav }) {
         className="sticky top-0 h-screen overflow-hidden"
         style={{ background: "transparent", fontFamily: FONT_BODY }}
       >
-        {/* Canvas — shifted up to crop empty top space, bottom naturally cropped */}
+        {/* Canvas — image shifted up inside drawImageCover */}
         <canvas
           ref={canvasRef}
-          className="absolute inset-x-0 z-0"
-          style={{ width: "100%", height: "100%", top: "-18%", imageRendering: "auto" }}
+          className="absolute inset-0 z-0"
+          style={{ width: "100%", height: "100%", imageRendering: "auto" }}
         />
 
-        {/* Bottom fade — blends video into page background, also covers watermark */}
+        {/* Bottom fade — blends video into page background, covers watermark */}
         <div
           className="absolute bottom-0 left-0 right-0 pointer-events-none"
           style={{
             zIndex: 2,
-            height: "38%",
-            background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 85%)`,
+            height: "45%",
+            background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 80%)`,
           }}
         />
 
@@ -367,8 +378,8 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — fades in when video ends, centered */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10 }}>
+        {/* Text — fades in when video ends */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-12%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div
               ref={textWrapRef}
