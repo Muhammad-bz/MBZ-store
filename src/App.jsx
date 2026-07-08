@@ -155,12 +155,12 @@ function preloadFrames(onProgress) {
   });
 }
 
-// object-fit: cover — shifts image down 5% (was up 15%) so cloth pile sits lower in frame
+// object-fit: cover — shifts image up 8% so cloth pile sits in the middle-lower area
 function drawImageCover(ctx, img, W, H) {
   if (!img || !img.naturalWidth) return;
   const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
   const dx    = (W - img.naturalWidth  * scale) / 2;
-  const dy    = (H - img.naturalHeight * scale) / 2 + H * 0.05;
+  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.08;
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
 }
 
@@ -341,8 +341,8 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — nudged up so Order Now button sits over the cloth pile */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-5%)" }}>
+        {/* Text — nudged down slightly so buttons sit over the cloth pile */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(2%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
               <h1 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto" style={{ color: C.maroon }}>
@@ -821,7 +821,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-20vh" }}>
+      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-4vh" }}>
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
