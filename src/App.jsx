@@ -116,8 +116,8 @@ const FRAME_PATH = (n, mobile) => {
   const t  = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(3);
   const id = mobile ? MOBILE_ID : DESKTOP_ID;
   const tr = mobile
-    ? "w_1080,h_1920,c_fill,g_center,z_1.6,e_brightness:25,q_auto:best"
-    : "w_1920,h_1080,c_fill,g_center,z_1.8,e_brightness:25,q_auto:best";
+    ? "w_1080,h_1920,c_fill,g_center,z_1.6,e_brightness:8,q_auto:best"
+    : "w_1920,h_1080,c_fill,g_center,z_1.8,e_brightness:8,q_auto:best";
   return `${CLOUDINARY_BASE}/${tr}/so_${t}/${id}.jpg`;
 };
 
@@ -351,7 +351,7 @@ function CinematicHero({ onNav }) {
           <div style={{ width: 200, height: 2, background: "rgba(255,255,255,0.1)", borderRadius: 2 }}>
             <div
               ref={loadBarRef}
-              style={{ height: "100%", width: "0%", background: ACCENT_BAR, borderRadius: 2, transition: "width 0.08s linear" }}
+              style={{ height: "100%", width: "0%", background: "#5C3D2A", borderRadius: 2, transition: "width 0.08s linear" }}
             />
           </div>
         </div>
@@ -365,7 +365,7 @@ function CinematicHero({ onNav }) {
             >
               <h1
                 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto"
-                style={{ color: "#F4E8C8" }}
+                style={{ color: C.maroon }}
               >
                 {SCENES[0].lines.map((line, i) => {
                   const isAccent = line === "Motion.";
@@ -374,7 +374,7 @@ function CinematicHero({ onNav }) {
                       key={i}
                       className="block"
                       style={isAccent
-                        ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: "#C8A882" }
+                        ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: C.inkSoft }
                         : undefined}
                     >
                       {line}
@@ -384,7 +384,7 @@ function CinematicHero({ onNav }) {
               </h1>
               <p
                 className="mt-3 max-w-md mx-auto text-xs sm:text-sm font-medium"
-                style={{ color: "rgba(244,232,200,0.75)" }}
+                style={{ color: C.inkSoft }}
               >
                 {SCENES[0].sub}
               </p>
@@ -392,14 +392,14 @@ function CinematicHero({ onNav }) {
                 <button
                   onClick={() => onNav("category", "shoes")}
                   className="px-5 py-2.5 rounded-full text-xs font-medium flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
-                  style={{ background: "#C8A882", color: "#2E0F05" }}
+                  style={{ background: "#5C3D2A", color: C.bgSoft }}
                 >
                   Order Now <ArrowRight size={16} />
                 </button>
                 <button
                   onClick={() => onNav("category", "apparel")}
                   className="px-5 py-2.5 rounded-full text-xs font-medium border"
-                  style={{ borderColor: "rgba(244,232,200,0.6)", color: "#F4E8C8" }}
+                  style={{ borderColor: C.maroon, color: C.maroon }}
                 >
                   Explore Apparel
                 </button>
@@ -414,10 +414,10 @@ function CinematicHero({ onNav }) {
           className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5"
           style={{ zIndex: 10, opacity: 1 }}
         >
-          <span style={{ fontSize: 10, letterSpacing: "0.2em", color: "rgba(244,232,200,0.6)", textTransform: "uppercase", animation: "hintPulse 2s ease-in-out infinite" }}>
+          <span style={{ fontSize: 10, letterSpacing: "0.2em", color: C.inkSoft, textTransform: "uppercase", animation: "hintPulse 2s ease-in-out infinite" }}>
             Scroll slowly
           </span>
-          <svg width="16" height="10" viewBox="0 0 16 10" style={{ animation: "hintPulse 2s ease-in-out infinite", color: "rgba(244,232,200,0.6)" }}>
+          <svg width="16" height="10" viewBox="0 0 16 10" style={{ animation: "hintPulse 2s ease-in-out infinite", color: C.inkSoft }}>
             <path d="M1 1l7 7 7-7" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </div>
