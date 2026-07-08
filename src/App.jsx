@@ -155,12 +155,12 @@ function preloadFrames(onProgress) {
   });
 }
 
-// object-fit: cover — shifts image up 15% to push watermark below canvas edge
+// object-fit: cover — shifts image down 5% (was up 15%) so cloth pile sits lower in frame
 function drawImageCover(ctx, img, W, H) {
   if (!img || !img.naturalWidth) return;
   const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
   const dx    = (W - img.naturalWidth  * scale) / 2;
-  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.15;
+  const dy    = (H - img.naturalHeight * scale) / 2 + H * 0.05;
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
 }
 
@@ -341,8 +341,8 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — centered, nudged down 8% so it sits over the clothes */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(8%)" }}>
+        {/* Text — nudged up so Order Now button sits over the cloth pile */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-5%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
               <h1 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto" style={{ color: C.maroon }}>
@@ -717,48 +717,68 @@ function CategorySection({ onNav }) {
 
   useEffect(() => {
     const ease = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+    let ticking = false;
 
-    const onScroll = () => {
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = requestAnimationFrame(() => {
-        const vh = window.innerHeight;
-        const isMobile = window.innerWidth < 640;
-        const [acc, apparel, shoes] = cardRefs.current;
-        if (!acc || !apparel || !shoes) return;
+    const update = () => {
+      ticking = false;
+      const vh = window.innerHeight;
+      const isMobile = window.innerWidth < 640;
+      const [acc, apparel, shoes] = cardRefs.current;
+      if (!acc || !apparel || !shoes) return;
 
-        if (isMobile) {
-          const cp = (el) => {
-            const { top } = el.getBoundingClientRect();
-            return ease((vh - top) / (vh * 0.65));
-          };
-          const p0 = cp(acc), p1 = cp(apparel), p2 = cp(shoes);
-          acc.style.transform     = `translateX(${(1 - p0) * -110}%)`;
-          acc.style.opacity       = p0.toFixed(3);
-          apparel.style.transform = `translateY(${(1 - p1) * 80}%)`;
-          apparel.style.opacity   = p1.toFixed(3);
-          shoes.style.transform   = `translateX(${(1 - p2) * 110}%)`;
-          shoes.style.opacity     = p2.toFixed(3);
-        } else {
-          const { top } = sectionRef.current.getBoundingClientRect();
-          const p = ease((vh - top) / (vh * 0.6));
-          acc.style.transform     = `translateX(${(1 - p) * -110}%)`;
-          acc.style.opacity       = p.toFixed(3);
-          apparel.style.transform = `translateY(${(1 - p) * 80}%)`;
-          apparel.style.opacity   = p.toFixed(3);
-          shoes.style.transform   = `translateX(${(1 - p) * 110}%)`;
-          shoes.style.opacity     = p.toFixed(3);
-        }
-      });
+      if (isMobile) {
+        const cp = (el) => {
+          const { top } = el.getBoundingClientRect();
+          return ease((vh - top) / (vh * 0.65));
+        };
+        const p0 = cp(acc), p1 = cp(apparel), p2 = cp(shoes);
+        // clamp to avoid over-shooting which causes flicker
+        const x0 = Math.max(-110, Math.min(0, (1 - p0) * -110));
+        const y1 = Math.max(0, Math.min(80, (1 - p1) * 80));
+        const x2 = Math.max(0, Math.min(110, (1 - p2) * 110));
+        acc.style.transform     = `translateX(${x0}%)`;
+        acc.style.opacity       = p0.toFixed(3);
+        apparel.style.transform = `translateY(${y1}%)`;
+        apparel.style.opacity   = p1.toFixed(3);
+        shoes.style.transform   = `translateX(${x2}%)`;
+        shoes.style.opacity     = p2.toFixed(3);
+      } else {
+        const { top } = sectionRef.current.getBoundingClientRect();
+        const p = ease((vh - top) / (vh * 0.6));
+        const x = Math.max(-110, Math.min(0, (1 - p) * -110));
+        const y = Math.max(0, Math.min(80, (1 - p) * 80));
+        const x2 = Math.max(0, Math.min(110, (1 - p) * 110));
+        acc.style.transform     = `translateX(${x}%)`;
+        acc.style.opacity       = p.toFixed(3);
+        apparel.style.transform = `translateY(${y}%)`;
+        apparel.style.opacity   = p.toFixed(3);
+        shoes.style.transform   = `translateX(${x2}%)`;
+        shoes.style.opacity     = p.toFixed(3);
+      }
     };
 
-    cardRefs.current.forEach((el) => { if (el) el.style.opacity = "0"; });
+    const onScroll = () => {
+      if (!ticking) {
+        rafRef.current = requestAnimationFrame(update);
+        ticking = true;
+      }
+    };
+
+    cardRefs.current.forEach((el) => {
+      if (el) {
+        el.style.opacity = "0";
+        el.style.willChange = "transform, opacity";
+      }
+    });
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
-    onScroll();
+    update(); // run once immediately
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      // Clean up will-change when component unmounts
+      cardRefs.current.forEach((el) => { if (el) el.style.willChange = "auto"; });
     };
   }, []);
 
@@ -774,7 +794,7 @@ function CategorySection({ onNav }) {
                 ref={(el) => { cardRefs.current[i] = el; }}
                 onClick={() => onNav("category", key)}
                 className="group relative h-64 rounded-2xl overflow-hidden text-left"
-                style={{ opacity: 0, willChange: "transform, opacity", background: "#5C3D2A" }}
+                style={{ opacity: 0, background: "#5C3D2A" }}
               >
                 <div className="absolute inset-0 rounded-2xl overflow-hidden">
                   <img
