@@ -115,12 +115,11 @@ const FRAME_COUNT     = 120; // ↑ from 90 — noticeably smoother inter-frame 
 const FRAME_PATH = (n, mobile) => {
   const t  = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(3);
   const id = mobile ? MOBILE_ID : DESKTOP_ID;
-  // Step 1: crop bottom 12% to remove Kling watermark
-  // Step 2: scale to fill target dimensions + brightness
-  const crop = mobile
-    ? "w_1080,h_1693,c_crop,g_north/w_1080,h_1920,c_fill,e_brightness:8,q_auto:best"
-    : "w_1920,h_950,c_crop,g_north/w_1920,h_1080,c_fill,e_brightness:8,q_auto:best";
-  return `${CLOUDINARY_BASE}/${crop}/so_${t}/${id}.jpg`;
+  // Crop bottom 12% to remove watermark, no rescaling (no zoom)
+  const tr = mobile
+    ? "w_1080,h_1690,c_crop,g_north,e_brightness:8,q_auto:best"
+    : "w_1920,h_950,c_crop,g_north,e_brightness:8,q_auto:best";
+  return `${CLOUDINARY_BASE}/${tr}/so_${t}/${id}.jpg`;
 };
 
 // Preload all frames — captures mobile flag ONCE, 12 s safety fallback
@@ -319,47 +318,41 @@ function CinematicHero({ onNav }) {
 
   // ── Passive scroll listener ──────────────────────────────────────
   useEffect(() => {
-    // Capture once after layout — avoids Chrome URL-bar jumping
-    // getBoundingClientRect().top + scrollY gives absolute page offset
-    let pageTop   = 0;
+    // Hero is always the first element — scrollY 0 = start of animation
+    // pageTop is always 0; pageTotal is container height minus viewport height
     let pageTotal = 0;
 
     const measure = () => {
       const el = containerRef.current;
       if (!el) return;
-      const rect = el.getBoundingClientRect();
-      pageTop   = rect.top + window.scrollY;
-      pageTotal = el.offsetHeight - window.innerHeight;
+      pageTotal = el.getBoundingClientRect().height - window.innerHeight;
     };
 
     const onScroll = () => {
       if (pageTotal <= 0) return;
-      progressRef.current = Math.min(1, Math.max(0, (window.scrollY - pageTop) / pageTotal));
+      progressRef.current = Math.min(1, Math.max(0, window.scrollY / pageTotal));
     };
 
-    // Wait two frames for layout to fully settle (fonts, images, navbar)
     requestAnimationFrame(() => requestAnimationFrame(() => {
       measure();
       onScroll();
     }));
 
     window.addEventListener("scroll", onScroll, { passive: true });
-    // Re-measure only on true resize (orientation change), not URL bar hide/show
-    window.addEventListener("resize", () => { measure(); onScroll(); }, { passive: true });
+    const mq = window.matchMedia("(orientation: landscape)");
+    mq.addEventListener("change", () => { measure(); onScroll(); });
 
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-    };
+    return () => { window.removeEventListener("scroll", onScroll); };
   }, []);
 
   return (
     // 300 vh → 100 vh viewport + 200 vh of scroll room
     // Previously 180 vh gave only 80 vh of actual scrub room —
     // users blew through the full video in ~2 seconds at normal speed.
-    <div ref={containerRef} style={{ height: "300dvh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "300vh", position: "relative" }}>
       <div
         className="sticky top-0 overflow-hidden"
-        style={{ height: "100dvh", background: "transparent", fontFamily: FONT_BODY }}
+        style={{ height: "100vh", background: "transparent", fontFamily: FONT_BODY }}
       >
         {/* Canvas — image shifted up inside drawImageCover */}
         <canvas
@@ -513,7 +506,7 @@ function TiltCard({ product, onOpen, isWishlisted, onToggleWish }) {
 function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, setQuery }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-40" style={{ background: "#5C3D2A" }}>
+    <header className="fixed top-0 left-0 right-0 z-40" style={{ background: "#5C3D2A" }}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: C.bgSoft }}>MBZ</button>
 
@@ -1269,7 +1262,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen font-sans" style={{ background: C.bg, color: C.ink, fontFamily: FONT_BODY }}>
+    <div className="min-h-screen font-sans" style={{ background: C.bg, color: C.ink, fontFamily: FONT_BODY, paddingTop: "64px" }}>
       <GlobalFonts />
       <Navbar cartCount={cartCount} onNav={handleNav} onCart={() => setCartOpen(true)} searchOpen={searchOpen} setSearchOpen={setSearchOpen} query={query} setQuery={setQuery} />
 
