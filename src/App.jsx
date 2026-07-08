@@ -335,8 +335,8 @@ function CinematicHero({ onNav }) {
         {/* Canvas — full screen, holds last frame permanently */}
         <canvas
           ref={canvasRef}
-          className="absolute inset-0 z-0"
-          style={{ width: "100%", height: "100%", opacity: 1, imageRendering: "auto" }}
+          className="absolute inset-x-0 z-0"
+          style={{ width: "100%", height: "115%", top: "-15%", imageRendering: "auto" }}
         />
 
         {/* Bottom fade — blends video into page background seamlessly */}
