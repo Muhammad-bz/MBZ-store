@@ -160,8 +160,8 @@ function drawImageCover(ctx, img, W, H) {
   if (!img || !img.naturalWidth) return;
   const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
   const dx    = (W - img.naturalWidth  * scale) / 2;
-  // Shift image up 8% for composition, then clip 6% extra from bottom to hide watermark
-  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.08 - H * 0.06;
+  // Shift image up 8% for composition, then clip 14% from bottom to fully hide watermark
+  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.08 - H * 0.14;
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
 }
 
@@ -329,9 +329,9 @@ function CinematicHero({ onNav }) {
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }} />
 
-        {/* Bottom fade */}
+        {/* Bottom fade — tall gradient to blend video into page bg, hiding any residual watermark */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ zIndex: 2, height: "35%", background: `linear-gradient(to bottom, transparent, ${C.bg})` }} />
+          style={{ zIndex: 2, height: "50%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 75%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
@@ -342,8 +342,8 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — tiny lift so it sits just above the cloth pile */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-1%)" }}>
+        {/* Text — shifted down ~15% so it sits over the cloth pile with buttons visible above it */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(15%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
               <h1 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto" style={{ color: C.maroon }}>
@@ -794,8 +794,8 @@ function CategorySection({ onNav }) {
                 key={key}
                 ref={(el) => { cardRefs.current[i] = el; }}
                 onClick={() => onNav("category", key)}
-                className="group relative h-80 rounded-2xl overflow-hidden text-left"
-                style={{ opacity: 0, background: "#5C3D2A" }}
+                className="group relative rounded-2xl overflow-hidden text-left"
+                style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3" }}
               >
                 <div className="absolute inset-0 rounded-2xl overflow-hidden">
                   <img
