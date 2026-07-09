@@ -720,133 +720,203 @@ function SunglassesIllustration() {
    Desktop: section-level trigger, staggered fade-up
 ══════════════════════════════════════════════════════════ */
 const CATEGORY_CARDS = {
-  accessories: { label: "Accessories Collection", tag: "The Detail", img: "/Accessories_Collection_Panel.png", video: "https://res.cloudinary.com/leu4dssl/video/upload/v1783608999/lv_0_20260709194928_csaect.mp4", accent: "#C8A882" },
-  apparel:     { label: "Clothing Collection",    tag: "The Detail", img: "/Clothing_Collection_Panel.png",   video: "https://res.cloudinary.com/leu4dssl/video/upload/v1783609030/lv_0_20260709173259_frn7xg.mp4", accent: "#C8A882" },
-  shoes:       { label: "Footwear Collection",    tag: "The Detail", img: "/Shoes_Collection_Panel.png",      video: "https://res.cloudinary.com/leu4dssl/video/upload/v1783609018/lv_0_20260709194610_racjqr.mp4", accent: "#C8A882" },
+  accessories: { label: "Accessories Collection", tag: "The Detail", img: "/Accessories_Collection_Panel.png", publicId: "v1783608999/lv_0_20260709194928_csaect", accent: "#C8A882" },
+  apparel:     { label: "Clothing Collection",    tag: "The Detail", img: "/Clothing_Collection_Panel.png",   publicId: "v1783609030/lv_0_20260709173259_frn7xg", accent: "#C8A882" },
+  shoes:       { label: "Footwear Collection",    tag: "The Detail", img: "/Shoes_Collection_Panel.png",      publicId: "v1783609018/lv_0_20260709194610_racjqr", accent: "#C8A882" },
 };
 
-/* ── Per-panel video hover card ─────────────────────────────────── */
-function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
-  const { label, img, video } = card;
-  const videoRef    = useRef(null);
-  const imgRef      = useRef(null);
-  const rafRef      = useRef(null);   // rAF id for reverse playback
-  // stateRef values: "idle" | "playing" | "reversing" | "leaving"
-  // "leaving" = mouse left while playing — reverse to 0 then hide
-  const stateRef    = useRef("idle");
-  const isHoveredRef = useRef(false); // tracks live hover state on desktop
+/* ══════════════════════════════════════════════════════════
+   PANEL FRAME SEQUENCE (Cloudinary) — same technique as the
+   cinematic hero: instead of a <video> tag (which stutters
+   when we scrub currentTime for reverse playback), we pull a
+   sequence of jpg frames from Cloudinary and paint them onto a
+   <canvas>. Reverse is then just "walk the same array
+   backwards" — perfectly smooth, no decoder seeking, no gap.
+══════════════════════════════════════════════════════════ */
+const PANEL_FRAME_COUNT  = 45;   // frames captured per panel clip
+const PANEL_FALLBACK_DUR = 2.5;  // seconds — used only if the metadata probe fails
 
-  // Detect mobile once per mount
-  const isMobile = useRef(typeof window !== "undefined" && window.innerWidth < 768);
+const panelFramePath = (publicId, n, frameCount, duration) => {
+  const t = ((n / (frameCount - 1)) * duration).toFixed(3);
+  return `${CLOUDINARY_BASE}/w_960,h_720,c_fill,g_center,q_auto:good/so_${t}/${publicId}.jpg`;
+};
 
-  const cancelRaf = () => {
-    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-  };
+// Probe real clip duration via a metadata-only, never-rendered <video>,
+// then preload every frame image. Always resolves (falls back on failure).
+function loadPanelFrames(publicId, onProgress) {
+  return new Promise((resolve) => {
+    const probe = document.createElement("video");
+    probe.preload = "metadata";
+    probe.muted   = true;
+    probe.src     = `${CLOUDINARY_BASE}/${publicId}.mp4`;
 
-  // ── Shared reverse stepper ────────────────────────────────────────
-  // mode "pingpong" → when reaching 0, play forward again (mobile + desktop hover loop)
-  // mode "leave"    → when reaching 0, hide video and show image (desktop mouse-left)
-  const startReverse = useCallback((mode) => {
-    const vid = videoRef.current;
-    if (!vid) return;
-    cancelRaf();
-    vid.pause();
-    stateRef.current = "reversing";
+    let settled = false;
+    const proceed = (duration) => {
+      if (settled) return;
+      settled = true;
 
-    // Adaptive step: aim for ~60 fps rewind at natural 1× speed
-    // 0.033 s per rAF tick ≈ 2 s video reversed in 2 s — same duration as forward
-    const STEP = 0.033;
-
-    const step = () => {
-      // If state changed externally (e.g. hover re-entered mid-reverse), abort
-      if (stateRef.current !== "reversing") return;
-
-      const newTime = vid.currentTime - STEP;
-
-      if (newTime <= 0) {
-        vid.currentTime = 0;
-
-        if (mode === "leave") {
-          // Mouse already left — hide video, restore image
-          vid.style.opacity            = "0";
-          if (imgRef.current) imgRef.current.style.opacity = "1";
-          stateRef.current = "idle";
-        } else {
-          // ping-pong: hit the start — play forward again seamlessly
-          stateRef.current = "playing";
-          vid.play().catch(() => {});
-        }
-        return;
+      const images = new Array(PANEL_FRAME_COUNT);
+      let loaded = 0;
+      const done = (i, img) => {
+        images[i] = img;
+        loaded++;
+        onProgress(loaded / PANEL_FRAME_COUNT);
+        if (loaded === PANEL_FRAME_COUNT) resolve({ images, duration });
+      };
+      for (let i = 0; i < PANEL_FRAME_COUNT; i++) {
+        const img = new Image();
+        img.onload  = () => done(i, img);
+        img.onerror = () => done(i, null);
+        img.src     = panelFramePath(publicId, i, PANEL_FRAME_COUNT, duration);
       }
-
-      vid.currentTime = newTime;
-      rafRef.current  = requestAnimationFrame(step);
     };
 
-    rafRef.current = requestAnimationFrame(step);
+    probe.addEventListener("loadedmetadata", () => {
+      const d = probe.duration;
+      proceed(Number.isFinite(d) && d > 0 ? d : PANEL_FALLBACK_DUR);
+    });
+    probe.addEventListener("error", () => proceed(PANEL_FALLBACK_DUR));
+    // Safety net — never let a slow/broken probe block the panel forever
+    setTimeout(() => proceed(PANEL_FALLBACK_DUR), 6000);
+  });
+}
+
+/* ── Per-panel frame-sequence hover card ──────────────────────────
+   mode:      "idle" | "loop" | "leaving"
+   direction: "forward" | "reverse"
+   pos:       fractional frame index (0 … frameCount-1)
+
+   Mobile:  mode locks to "loop" forever from mount (video "runs all
+            the time"), ping-ponging forward → reverse → forward …
+   Desktop: hover-in starts "loop" ping-pong; hover-out flips
+            direction to reverse and switches mode to "leaving" so
+            it walks smoothly back to frame 0 from wherever it
+            currently is (no jump, no restart) and then hides.
+   Re-entering mid-reverse just flips mode back to "loop" — the
+   canvas is already mid-frame, so there's no visible gap.
+══════════════════════════════════════════════════════════════════ */
+function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
+  const { label, img, publicId } = card;
+  const canvasRef = useRef(null);
+  const imgRef    = useRef(null);
+
+  const framesRef   = useRef([]);
+  const durationRef = useRef(PANEL_FALLBACK_DUR);
+  const posRef       = useRef(0);
+  const directionRef = useRef("forward");
+  const modeRef       = useRef("idle");
+  const rafRef         = useRef(null);
+  const lastTsRef       = useRef(0);
+  const readyRef         = useRef(false);
+
+  const isMobile = useRef(typeof window !== "undefined" && window.innerWidth < 768);
+
+  const cancelRaf = () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
+
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const frames = framesRef.current;
+    if (!canvas || frames.length === 0) return;
+
+    const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
+    const W = canvas.clientWidth, H = canvas.clientHeight;
+    const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
+    if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
+
+    const ctx = canvas.getContext("2d");
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+
+    const rawPos = posRef.current;
+    const loIdx  = Math.max(0, Math.min(frames.length - 1, Math.floor(rawPos)));
+    const hiIdx  = Math.min(frames.length - 1, loIdx + 1);
+    const blend  = rawPos - loIdx;
+
+    if (frames[loIdx]?.naturalWidth) { ctx.globalAlpha = 1; drawImageCover(ctx, frames[loIdx], W, H); }
+    if (hiIdx !== loIdx && frames[hiIdx]?.naturalWidth && blend > 0.001) {
+      ctx.globalAlpha = blend; drawImageCover(ctx, frames[hiIdx], W, H); ctx.globalAlpha = 1;
+    }
   }, []);
 
-  // ── Mobile: autoplay ping-pong from mount ────────────────────────
+  // ── Main animation tick — real-time speed matched to clip duration ──
+  const tick = useCallback((ts) => {
+    if (!lastTsRef.current) lastTsRef.current = ts;
+    const dt = Math.min(0.05, (ts - lastTsRef.current) / 1000); // clamp for tab-switch jumps
+    lastTsRef.current = ts;
+
+    const frameCount   = PANEL_FRAME_COUNT;
+    const framesPerSec = (frameCount - 1) / durationRef.current;
+    const delta         = dt * framesPerSec;
+
+    if (directionRef.current === "forward") {
+      posRef.current += delta;
+      if (posRef.current >= frameCount - 1) {
+        posRef.current = frameCount - 1;
+        directionRef.current = "reverse"; // reached the end — reverse, no restart
+      }
+    } else {
+      posRef.current -= delta;
+      if (posRef.current <= 0) {
+        posRef.current = 0;
+        if (modeRef.current === "leaving") {
+          // Back at frame 0 — hide canvas, restore poster image, stop
+          if (canvasRef.current) canvasRef.current.style.opacity = "0";
+          if (imgRef.current) imgRef.current.style.opacity = "1";
+          modeRef.current = "idle";
+          lastTsRef.current = 0;
+          cancelRaf();
+          return;
+        }
+        directionRef.current = "forward"; // loop — play forward again, seamlessly
+      }
+    }
+
+    draw();
+    rafRef.current = requestAnimationFrame(tick);
+  }, [draw]);
+
+  const startLoop = useCallback(() => {
+    if (!readyRef.current) return; // frames still loading — effect below re-calls once ready
+    if (canvasRef.current) canvasRef.current.style.opacity = "1";
+    if (imgRef.current) imgRef.current.style.opacity = "0";
+    modeRef.current = "loop";
+    if (!rafRef.current) { lastTsRef.current = 0; rafRef.current = requestAnimationFrame(tick); }
+  }, [tick]);
+
+  // ── Load frames once on mount; mobile auto-starts as soon as ready ──
   useEffect(() => {
-    if (!isMobile.current) return;
-    const vid = videoRef.current;
-    if (!vid || !imgRef.current) return;
+    let cancelled = false;
+    loadPanelFrames(publicId, () => {}).then(({ images, duration }) => {
+      if (cancelled) return;
+      framesRef.current   = images;
+      durationRef.current = duration;
+      readyRef.current    = true;
+      if (isMobile.current) startLoop();
+    });
+    return () => { cancelled = true; };
+  }, [publicId, startLoop]);
 
-    // Show video immediately; hide static image
-    vid.style.opacity          = "1";
-    imgRef.current.style.opacity = "0";
-
-    stateRef.current = "playing";
-    vid.play().catch(() => {});
-    // onEnded → startReverse("pingpong") → play → onEnded → … forever
-  }, []);
-
-  // ── Desktop: hover handlers ───────────────────────────────────────
+  // ── Desktop hover handlers ───────────────────────────────────────
   const handleMouseEnter = useCallback(() => {
     if (isMobile.current) return;
-    const vid = videoRef.current;
-    if (!vid || !imgRef.current) return;
-
-    isHoveredRef.current = true;
-    cancelRaf();
-
-    // Show video
-    vid.style.opacity          = "1";
-    imgRef.current.style.opacity = "0";
-
-    // If already mid-video (e.g. re-entered while reversing), just resume forward
-    vid.playbackRate = 1;
-    stateRef.current = "playing";
-    vid.play().catch(() => {});
-  }, []);
+    if (modeRef.current === "leaving") {
+      // Mid-reverse — just resume looping from the current frame, no jump
+      modeRef.current = "loop";
+      if (canvasRef.current) canvasRef.current.style.opacity = "1";
+      if (imgRef.current) imgRef.current.style.opacity = "0";
+      return;
+    }
+    startLoop();
+  }, [startLoop]);
 
   const handleMouseLeave = useCallback(() => {
     if (isMobile.current) return;
-    const vid = videoRef.current;
-    if (!vid) return;
+    if (modeRef.current === "idle") return;
+    // Walk smoothly back to frame 0 from wherever we are right now, then hide
+    directionRef.current = "reverse";
+    modeRef.current = "leaving";
+  }, []);
 
-    isHoveredRef.current = false;
-
-    if (stateRef.current === "idle") return; // nothing playing, nothing to do
-
-    // If currently playing forward, reverse back to start then hide
-    // If currently reversing in ping-pong mode, switch mode to "leave" so it
-    // hides at 0 instead of looping — we do this by just restarting with "leave"
-    startReverse("leave");
-  }, [startReverse]);
-
-  // ── onEnded: video reached the end ───────────────────────────────
-  const handleEnded = useCallback(() => {
-    if (isMobile.current) {
-      // Mobile: always ping-pong back and forth
-      startReverse("pingpong");
-    } else {
-      // Desktop: still hovered? ping-pong. Mouse left? leave.
-      startReverse(isHoveredRef.current ? "pingpong" : "leave");
-    }
-  }, [startReverse]);
-
-  // ── Cleanup on unmount ───────────────────────────────────────────
   useEffect(() => () => cancelRaf(), []);
 
   return (
@@ -859,7 +929,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3" }}
     >
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
-        {/* Static image — shown on desktop idle, hidden on mobile */}
+        {/* Static poster — shown on desktop idle, hidden once frames take over */}
         <img
           ref={imgRef}
           src={img}
@@ -867,15 +937,9 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
           className="w-full h-full object-cover scale-[1.02]"
           style={{ transition: "opacity 0.25s ease", opacity: 1, position: "absolute", inset: 0 }}
         />
-        {/* Video: ping-pong on mobile always; ping-pong on desktop while hovered */}
-        <video
-          ref={videoRef}
-          src={video}
-          muted
-          playsInline
-          preload="auto"
-          loop={false}
-          onEnded={handleEnded}
+        {/* Frame-sequence canvas — ping-pongs on mobile always; on desktop while hovered */}
+        <canvas
+          ref={canvasRef}
           className="w-full h-full object-cover scale-[1.02]"
           style={{ transition: "opacity 0.25s ease", opacity: 0, position: "absolute", inset: 0 }}
         />
