@@ -332,7 +332,7 @@ function CinematicHero({ onNav }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ height: "300vh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "240vh", position: "relative" }}>
       <div className="sticky top-0 overflow-hidden" style={{ height: "100vh", fontFamily: FONT_BODY }}>
 
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
@@ -793,7 +793,7 @@ function CategorySection({ onNav }) {
   }, []);
 
   return (
-    <div style={{ overflow: "visible", transform: "translateY(-26vh)", marginBottom: "-26vh" }}>
+    <div style={{ overflow: "visible" }}>
       <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => {
@@ -831,7 +831,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 10, background: C.bg }}>
+      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-26vh" }}>
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
