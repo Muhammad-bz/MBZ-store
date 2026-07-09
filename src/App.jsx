@@ -355,7 +355,7 @@ function CinematicHero({ onNav }) {
         <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-2%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
-              <h1 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto" style={{ color: C.maroon }}>
+              <h1 className="text-4xl sm:text-6xl font-black leading-[0.85] mx-auto" style={{ color: C.maroon }}>
                 {SCENES[0].lines.map((line, i) => {
                   const isAccent = line === "Motion.";
                   return (
@@ -371,12 +371,12 @@ function CinematicHero({ onNav }) {
               </p>
               <div className="mt-4 flex flex-row items-center justify-center gap-3">
                 <button onClick={() => onNav("category", "shoes")}
-                  className="px-5 py-2.5 rounded-full text-xs font-medium flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
+                  className="px-5 py-2.5 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
                   style={{ background: "#5C3D2A", color: C.bgSoft }}>
                   Order Now <ArrowRight size={16} />
                 </button>
                 <button onClick={() => onNav("category", "apparel")}
-                  className="px-5 py-2.5 rounded-full text-xs font-medium border"
+                  className="px-5 py-2.5 rounded-full text-sm font-medium border"
                   style={{ borderColor: C.maroon, color: C.maroon }}>
                   Explore Apparel
                 </button>
@@ -793,8 +793,8 @@ function CategorySection({ onNav }) {
   }, []);
 
   return (
-    <div style={{ overflow: "hidden", background: C.bg }}>
-      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
+    <div style={{ overflow: "visible" }}>
+      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16" style={{ marginTop: "-26vh" }}>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => {
             const { label, img } = card;
@@ -831,7 +831,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 10, marginTop: "-26vh" }}>
+      <div style={{ position: "relative", zIndex: 10, background: C.bg }}>
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
