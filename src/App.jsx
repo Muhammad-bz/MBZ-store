@@ -156,14 +156,12 @@ function preloadFrames(onProgress) {
 }
 
 // object-fit: cover — image drawn at natural cover scale.
-// Positive dy shift moves the image DOWN (lowers the cloth pile into frame).
-// Canvas is clipped to top 88% so the Kling AI watermark region is never painted —
-// no zoom, no scale change, just a paint boundary.
+// Canvas clipped to top 88% to hide Kling AI watermark without scaling.
 function drawImageCover(ctx, img, W, H) {
   if (!img || !img.naturalWidth) return;
   const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
   const dx    = (W - img.naturalWidth  * scale) / 2;
-  // -5% nudges image up so it fills from the top
+  // -8% nudges image up so it fills from the top
   const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.08;
   // Clip: only paint the top 88% of the canvas, cutting the watermark strip
   ctx.save();
@@ -332,13 +330,13 @@ function CinematicHero({ onNav }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ height: "240vh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "300vh", position: "relative" }}>
       <div className="sticky top-0 overflow-hidden" style={{ height: "100vh", fontFamily: FONT_BODY }}>
 
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }} />
 
-        {/* Bottom fade — covers the clipped watermark strip and blends video into page bg */}
+        {/* Bottom fade — covers watermark strip and blends video into page bg */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
           style={{ zIndex: 2, height: "40%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 65%)` }} />
 
@@ -351,8 +349,8 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — shifted up so heading+buttons float just above the cloth pile */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-2%)" }}>
+        {/* Text — shifted down slightly so it sits over the cloth pile */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(2%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
               <h1 className="text-4xl sm:text-6xl font-black leading-[0.85] mx-auto" style={{ color: C.maroon }}>
@@ -793,7 +791,7 @@ function CategorySection({ onNav }) {
   }, []);
 
   return (
-    <div style={{ overflow: "visible" }}>
+    <div style={{ overflow: "hidden" }}>
       <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => {
@@ -831,7 +829,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-26vh" }}>
+      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-18vh" }}>
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
