@@ -338,7 +338,7 @@ function CinematicHero({ onNav }) {
 
         {/* Bottom fade — blends video floor into page bg */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ zIndex: 2, height: "20%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
+          style={{ zIndex: 2, height: "35%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
