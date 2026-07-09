@@ -720,10 +720,103 @@ function SunglassesIllustration() {
    Desktop: section-level trigger, staggered fade-up
 ══════════════════════════════════════════════════════════ */
 const CATEGORY_CARDS = {
-  accessories: { label: "Accessories Collection", tag: "The Detail",    img: "/Accessories_Collection_Panel.png", accent: "#C8A882" },
-  apparel:     { label: "Clothing Collection",    tag: "The Detail",    img: "/Clothing_Collection_Panel.png",    accent: "#C8A882" },
-  shoes:       { label: "Footwear Collection",    tag: "The Detail",    img: "/Shoes_Collection_Panel.png",       accent: "#C8A882" },
+  accessories: { label: "Accessories Collection", tag: "The Detail", img: "/Accessories_Collection_Panel.png", video: "https://res.cloudinary.com/leu4dssl/video/upload/v1783608999/lv_0_20260709194928_csaect.mp4", accent: "#C8A882" },
+  apparel:     { label: "Clothing Collection",    tag: "The Detail", img: "/Clothing_Collection_Panel.png",   video: "https://res.cloudinary.com/leu4dssl/video/upload/v1783609030/lv_0_20260709173259_frn7xg.mp4", accent: "#C8A882" },
+  shoes:       { label: "Footwear Collection",    tag: "The Detail", img: "/Shoes_Collection_Panel.png",      video: "https://res.cloudinary.com/leu4dssl/video/upload/v1783609018/lv_0_20260709194610_racjqr.mp4", accent: "#C8A882" },
 };
+
+/* ── Per-panel video hover card ─────────────────────────────────── */
+function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
+  const { label, img, video } = card;
+  const videoRef   = useRef(null);
+  const imgRef     = useRef(null);
+  const reverseRef = useRef(null); // rAF id for reverse playback
+  const stateRef   = useRef("idle"); // "idle" | "playing" | "reversing"
+
+  const cancelReverse = () => {
+    if (reverseRef.current) {
+      cancelAnimationFrame(reverseRef.current);
+      reverseRef.current = null;
+    }
+  };
+
+  const handleMouseEnter = () => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    cancelReverse();
+    stateRef.current = "playing";
+
+    // Cross-fade: show video, hide image
+    vid.style.opacity  = "1";
+    imgRef.current.style.opacity = "0";
+
+    // Always play from wherever it is (start if idle, resume if mid-reverse)
+    vid.playbackRate = 1;
+    vid.play().catch(() => {});
+  };
+
+  const handleMouseLeave = () => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    vid.pause();
+    stateRef.current = "reversing";
+
+    // Reverse frame-by-frame via rAF at ~60 fps stepping back ~1/30s per frame
+    const step = () => {
+      if (stateRef.current !== "reversing") return;
+      const newTime = vid.currentTime - 0.033;
+      if (newTime <= 0) {
+        vid.currentTime = 0;
+        // Cross-fade back: hide video, show image
+        vid.style.opacity            = "0";
+        imgRef.current.style.opacity = "1";
+        stateRef.current = "idle";
+        return;
+      }
+      vid.currentTime = newTime;
+      reverseRef.current = requestAnimationFrame(step);
+    };
+    reverseRef.current = requestAnimationFrame(step);
+  };
+
+  // When video naturally ends, start reversing
+  const handleEnded = () => {
+    handleMouseLeave();
+  };
+
+  return (
+    <button
+      ref={(el) => { cardRefs.current[index] = el; }}
+      onClick={() => onNav("category", cardKey)}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+      className="relative rounded-2xl overflow-hidden text-left"
+      style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3" }}
+    >
+      <div className="absolute inset-0 rounded-2xl overflow-hidden">
+        {/* Static image — always rendered, fades out on hover */}
+        <img
+          ref={imgRef}
+          src={img}
+          alt={label}
+          className="w-full h-full object-cover scale-[1.02]"
+          style={{ transition: "opacity 0.25s ease", opacity: 1, position: "absolute", inset: 0 }}
+        />
+        {/* Hover video — fades in on hover, same scale as image */}
+        <video
+          ref={videoRef}
+          src={video}
+          muted
+          playsInline
+          preload="auto"
+          onEnded={handleEnded}
+          className="w-full h-full object-cover scale-[1.02]"
+          style={{ transition: "opacity 0.25s ease", opacity: 0, position: "absolute", inset: 0 }}
+        />
+      </div>
+    </button>
+  );
+}
 
 function CategorySection({ onNav }) {
   const sectionRef = useRef(null);
@@ -747,7 +840,6 @@ function CategorySection({ onNav }) {
           return ease((vh - top) / (vh * 0.65));
         };
         const p0 = cp(acc), p1 = cp(apparel), p2 = cp(shoes);
-        // clamp to avoid over-shooting which causes flicker
         const x0 = Math.max(-110, Math.min(0, (1 - p0) * -110));
         const y1 = Math.max(0, Math.min(80, (1 - p1) * 80));
         const x2 = Math.max(0, Math.min(110, (1 - p2) * 110));
@@ -787,12 +879,11 @@ function CategorySection({ onNav }) {
     });
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
-    update(); // run once immediately
+    update();
     return () => {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      // Clean up will-change when component unmounts
       cardRefs.current.forEach((el) => { if (el) el.style.willChange = "auto"; });
     };
   }, []);
@@ -801,26 +892,9 @@ function CategorySection({ onNav }) {
     <div style={{ overflow: "hidden" }}>
       <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-          {Object.entries(CATEGORY_CARDS).map(([key, card], i) => {
-            const { label, img } = card;
-            return (
-              <button
-                key={key}
-                ref={(el) => { cardRefs.current[i] = el; }}
-                onClick={() => onNav("category", key)}
-                className="group relative rounded-2xl overflow-hidden text-left"
-                style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3" }}
-              >
-                <div className="absolute inset-0 rounded-2xl overflow-hidden">
-                  <img
-                    src={img}
-                    alt={label}
-                    className="w-full h-full object-cover scale-[1.02] transition-transform duration-500 group-hover:scale-[1.05]"
-                  />
-                </div>
-              </button>
-            );
-          })}
+          {Object.entries(CATEGORY_CARDS).map(([key, card], i) => (
+            <CategoryCard key={key} cardKey={key} card={card} index={i} cardRefs={cardRefs} onNav={onNav} />
+          ))}
         </div>
       </section>
     </div>
