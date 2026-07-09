@@ -155,14 +155,23 @@ function preloadFrames(onProgress) {
   });
 }
 
-// object-fit: cover — shifts image up 8% so cloth pile sits in the middle-lower area
+// object-fit: cover — image drawn at natural cover scale.
+// Positive dy shift moves the image DOWN (lowers the cloth pile into frame).
+// Canvas is clipped to top 88% so the Kling AI watermark region is never painted —
+// no zoom, no scale change, just a paint boundary.
 function drawImageCover(ctx, img, W, H) {
   if (!img || !img.naturalWidth) return;
   const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
   const dx    = (W - img.naturalWidth  * scale) / 2;
-  // Shift image up 8% for composition, then clip 14% from bottom to fully hide watermark
-  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.08 - H * 0.14;
+  // +8% shifts image down so cloth pile sits lower-centre
+  const dy    = (H - img.naturalHeight * scale) / 2 + H * 0.08;
+  // Clip: only paint the top 88% of the canvas, cutting the watermark strip
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(0, 0, W, Math.round(H * 0.88));
+  ctx.clip();
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
+  ctx.restore();
 }
 
 /* ══════════════════════════════════════════════════════════
@@ -329,9 +338,9 @@ function CinematicHero({ onNav }) {
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }} />
 
-        {/* Bottom fade — tall gradient to blend video into page bg, hiding any residual watermark */}
+        {/* Bottom fade — covers the clipped watermark strip and blends video into page bg */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ zIndex: 2, height: "50%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 75%)` }} />
+          style={{ zIndex: 2, height: "40%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 65%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
@@ -342,8 +351,8 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — shifted down ~15% so it sits over the cloth pile with buttons visible above it */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(15%)" }}>
+        {/* Text — shifted up so heading+buttons float just above the cloth pile */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-10%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
               <h1 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto" style={{ color: C.maroon }}>
@@ -801,7 +810,7 @@ function CategorySection({ onNav }) {
                   <img
                     src={img}
                     alt={label}
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="w-full h-full object-cover scale-110 transition-transform duration-500 group-hover:scale-115"
                   />
                 </div>
               </button>
