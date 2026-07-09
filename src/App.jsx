@@ -798,7 +798,7 @@ function CategorySection({ onNav }) {
   }, []);
 
   return (
-    <div style={{ overflow: "hidden" }}>
+    <div style={{ overflow: "visible", background: C.bg }}>
       <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => {
@@ -836,7 +836,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-30vh" }}>
+      <div style={{ position: "relative", zIndex: 10, marginTop: "-30vh" }}>
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
