@@ -798,8 +798,8 @@ function CategorySection({ onNav }) {
   }, []);
 
   return (
-    <div style={{ overflow: "hidden" }}>
-      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
+    <div style={{ overflow: "visible", background: C.bg }}>
+      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 pt-0 pb-6">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => {
             const { label, img } = card;
@@ -836,10 +836,10 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 25, background: C.bg, marginTop: "-30vh" }}>
+      <div style={{ position: "relative", zIndex: 25, marginTop: "-30vh" }}>
         <CategorySection onNav={onNav} />
 
-        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
+        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10" style={{ background: C.bg }}>
           <div className="flex items-end justify-between mb-6">
             <h2 className="text-2xl font-black" style={{ color: C.ink }}>Featured</h2>
             <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
