@@ -166,7 +166,7 @@ function drawImageCover(ctx, img, W, H) {
   // Clip: only paint the top 88% of the canvas, cutting the watermark strip
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, 0, W, Math.round(H * 0.93));
+  ctx.rect(0, 0, W, Math.round(H * 0.88));
   ctx.clip();
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
   ctx.restore();
@@ -336,9 +336,9 @@ function CinematicHero({ onNav }) {
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }} />
 
-        {/* Bottom fade — covers watermark strip and blends video into page bg */}
+        {/* Bottom fade — only blends the very bottom edge into page bg */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ zIndex: 2, height: "18%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
+          style={{ zIndex: 2, height: "25%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
@@ -798,8 +798,8 @@ function CategorySection({ onNav }) {
   }, []);
 
   return (
-    <div style={{ overflow: "visible", background: C.bg }}>
-      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-6">
+    <div style={{ overflow: "hidden" }}>
+      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => {
             const { label, img } = card;
@@ -836,7 +836,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 10 }}>
+      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-30vh" }}>
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
