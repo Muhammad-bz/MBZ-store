@@ -720,9 +720,9 @@ function SunglassesIllustration() {
    Desktop: section-level trigger, staggered fade-up
 ══════════════════════════════════════════════════════════ */
 const CATEGORY_CARDS = {
-  accessories: { label: "Accessories Collection", tag: "The Detail", img: "/Accessories_Collection_Panel.png", publicId: "v1783608999/lv_0_20260709194928_csaect", accent: "#C8A882" },
-  apparel:     { label: "Clothing Collection",    tag: "The Detail", img: "/Clothing_Collection_Panel.png",   publicId: "v1783609030/lv_0_20260709173259_frn7xg", accent: "#C8A882" },
-  shoes:       { label: "Footwear Collection",    tag: "The Detail", img: "/Shoes_Collection_Panel.png",      publicId: "v1783609018/lv_0_20260709194610_racjqr", accent: "#C8A882" },
+  accessories: { label: "Accessories Collection", tag: "The Detail", publicId: "v1783608999/lv_0_20260709194928_csaect", accent: "#C8A882" },
+  apparel:     { label: "Clothing Collection",    tag: "The Detail", publicId: "v1783609030/lv_0_20260709173259_frn7xg", accent: "#C8A882" },
+  shoes:       { label: "Footwear Collection",    tag: "The Detail", publicId: "v1783609018/lv_0_20260709194610_racjqr", accent: "#C8A882" },
 };
 
 /* ══════════════════════════════════════════════════════════
@@ -741,43 +741,37 @@ const panelFramePath = (publicId, n, frameCount, duration) => {
   return `${CLOUDINARY_BASE}/w_960,h_720,c_fill,g_center,q_auto:good/so_${t}/${publicId}.jpg`;
 };
 
-// Probe real clip duration via a metadata-only, never-rendered <video>,
-// then preload every frame image. Always resolves (falls back on failure).
+// Preload every frame image from Cloudinary — no <video> element, no mp4.
+// Duration is fixed (PANEL_FALLBACK_DUR); always resolves.
 function loadPanelFrames(publicId, onProgress) {
   return new Promise((resolve) => {
-    const probe = document.createElement("video");
-    probe.preload = "metadata";
-    probe.muted   = true;
-    probe.src     = `${CLOUDINARY_BASE}/${publicId}.mp4`;
+    const duration = PANEL_FALLBACK_DUR;
+    const images   = new Array(PANEL_FRAME_COUNT);
+    let   loaded   = 0;
+    let   resolved = false;
 
-    let settled = false;
-    const proceed = (duration) => {
-      if (settled) return;
-      settled = true;
+    // Safety net — never block the panel forever on a slow connection
+    const fallback = setTimeout(() => {
+      if (!resolved) { resolved = true; resolve({ images, duration }); }
+    }, 10000);
 
-      const images = new Array(PANEL_FRAME_COUNT);
-      let loaded = 0;
-      const done = (i, img) => {
-        images[i] = img;
-        loaded++;
-        onProgress(loaded / PANEL_FRAME_COUNT);
-        if (loaded === PANEL_FRAME_COUNT) resolve({ images, duration });
-      };
-      for (let i = 0; i < PANEL_FRAME_COUNT; i++) {
-        const img = new Image();
-        img.onload  = () => done(i, img);
-        img.onerror = () => done(i, null);
-        img.src     = panelFramePath(publicId, i, PANEL_FRAME_COUNT, duration);
+    const done = (i, img) => {
+      images[i] = img;
+      loaded++;
+      onProgress(loaded / PANEL_FRAME_COUNT);
+      if (loaded === PANEL_FRAME_COUNT && !resolved) {
+        resolved = true;
+        clearTimeout(fallback);
+        resolve({ images, duration });
       }
     };
 
-    probe.addEventListener("loadedmetadata", () => {
-      const d = probe.duration;
-      proceed(Number.isFinite(d) && d > 0 ? d : PANEL_FALLBACK_DUR);
-    });
-    probe.addEventListener("error", () => proceed(PANEL_FALLBACK_DUR));
-    // Safety net — never let a slow/broken probe block the panel forever
-    setTimeout(() => proceed(PANEL_FALLBACK_DUR), 6000);
+    for (let i = 0; i < PANEL_FRAME_COUNT; i++) {
+      const img = new Image();
+      img.onload  = () => done(i, img);
+      img.onerror = () => done(i, null);
+      img.src     = panelFramePath(publicId, i, PANEL_FRAME_COUNT, duration);
+    }
   });
 }
 
@@ -796,42 +790,42 @@ function loadPanelFrames(publicId, onProgress) {
    canvas is already mid-frame, so there's no visible gap.
 ══════════════════════════════════════════════════════════════════ */
 function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
-  const { label, img, publicId } = card;
-  const canvasRef = useRef(null);
-  const imgRef    = useRef(null);
+  const { label, publicId } = card;
 
-  const framesRef   = useRef([]);
-  const durationRef = useRef(PANEL_FALLBACK_DUR);
+  // Two canvases: posterCanvas holds frame 0 (always visible as the "still"),
+  // animCanvas does the ping-pong — crossfades in on hover/mobile.
+  const posterCanvasRef = useRef(null);
+  const animCanvasRef   = useRef(null);
+  const loadBarRef      = useRef(null);
+  const loadWrapRef     = useRef(null);
+
+  const framesRef    = useRef([]);
+  const durationRef  = useRef(PANEL_FALLBACK_DUR);
   const posRef       = useRef(0);
   const directionRef = useRef("forward");
-  const modeRef       = useRef("idle");
-  const rafRef         = useRef(null);
-  const lastTsRef       = useRef(0);
-  const readyRef         = useRef(false);
+  const modeRef      = useRef("idle");
+  const rafRef       = useRef(null);
+  const lastTsRef    = useRef(0);
+  const readyRef     = useRef(false);
 
   const isMobile = useRef(typeof window !== "undefined" && window.innerWidth < 768);
 
   const cancelRaf = () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
 
-  const draw = useCallback(() => {
-    const canvas = canvasRef.current;
+  // Draw a frame index to a given canvas element
+  const drawToCanvas = useCallback((canvas, rawPos) => {
     const frames = framesRef.current;
     if (!canvas || frames.length === 0) return;
-
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     const W = canvas.clientWidth, H = canvas.clientHeight;
     const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
     if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
-
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
-
-    const rawPos = posRef.current;
-    const loIdx  = Math.max(0, Math.min(frames.length - 1, Math.floor(rawPos)));
-    const hiIdx  = Math.min(frames.length - 1, loIdx + 1);
-    const blend  = rawPos - loIdx;
-
+    const loIdx = Math.max(0, Math.min(frames.length - 1, Math.floor(rawPos)));
+    const hiIdx = Math.min(frames.length - 1, loIdx + 1);
+    const blend = rawPos - loIdx;
     if (frames[loIdx]?.naturalWidth) { ctx.globalAlpha = 1; drawImageCover(ctx, frames[loIdx], W, H); }
     if (hiIdx !== loIdx && frames[hiIdx]?.naturalWidth && blend > 0.001) {
       ctx.globalAlpha = blend; drawImageCover(ctx, frames[hiIdx], W, H); ctx.globalAlpha = 1;
@@ -841,69 +835,74 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
   // ── Main animation tick — real-time speed matched to clip duration ──
   const tick = useCallback((ts) => {
     if (!lastTsRef.current) lastTsRef.current = ts;
-    const dt = Math.min(0.05, (ts - lastTsRef.current) / 1000); // clamp for tab-switch jumps
+    const dt = Math.min(0.05, (ts - lastTsRef.current) / 1000);
     lastTsRef.current = ts;
 
     const frameCount   = PANEL_FRAME_COUNT;
     const framesPerSec = (frameCount - 1) / durationRef.current;
-    const delta         = dt * framesPerSec;
+    const delta        = dt * framesPerSec;
 
     if (directionRef.current === "forward") {
       posRef.current += delta;
       if (posRef.current >= frameCount - 1) {
         posRef.current = frameCount - 1;
-        directionRef.current = "reverse"; // reached the end — reverse, no restart
+        directionRef.current = "reverse";
       }
     } else {
       posRef.current -= delta;
       if (posRef.current <= 0) {
         posRef.current = 0;
         if (modeRef.current === "leaving") {
-          // Back at frame 0 — hide canvas, restore poster image, stop
-          if (canvasRef.current) canvasRef.current.style.opacity = "0";
-          if (imgRef.current) imgRef.current.style.opacity = "1";
+          // Walked back to frame 0 — crossfade back to poster, stop
+          if (animCanvasRef.current) animCanvasRef.current.style.opacity = "0";
           modeRef.current = "idle";
           lastTsRef.current = 0;
           cancelRaf();
           return;
         }
-        directionRef.current = "forward"; // loop — play forward again, seamlessly
+        directionRef.current = "forward"; // seamless ping-pong loop
       }
     }
 
-    draw();
+    drawToCanvas(animCanvasRef.current, posRef.current);
     rafRef.current = requestAnimationFrame(tick);
-  }, [draw]);
+  }, [drawToCanvas]);
 
   const startLoop = useCallback(() => {
-    if (!readyRef.current) return; // frames still loading — effect below re-calls once ready
-    if (canvasRef.current) canvasRef.current.style.opacity = "1";
-    if (imgRef.current) imgRef.current.style.opacity = "0";
+    if (!readyRef.current) return;
+    if (animCanvasRef.current) animCanvasRef.current.style.opacity = "1";
     modeRef.current = "loop";
     if (!rafRef.current) { lastTsRef.current = 0; rafRef.current = requestAnimationFrame(tick); }
   }, [tick]);
 
-  // ── Load frames once on mount; mobile auto-starts as soon as ready ──
+  // ── Load frames once on mount ──
   useEffect(() => {
     let cancelled = false;
-    loadPanelFrames(publicId, () => {}).then(({ images, duration }) => {
+
+    loadPanelFrames(publicId, (pct) => {
+      if (cancelled) return;
+      if (loadBarRef.current) loadBarRef.current.style.width = `${pct * 100}%`;
+      if (pct >= 1 && loadWrapRef.current) loadWrapRef.current.style.display = "none";
+    }).then(({ images, duration }) => {
       if (cancelled) return;
       framesRef.current   = images;
       durationRef.current = duration;
       readyRef.current    = true;
+      if (loadWrapRef.current) loadWrapRef.current.style.display = "none";
+      // Paint frame 0 onto the poster canvas — no static PNG needed
+      drawToCanvas(posterCanvasRef.current, 0);
       if (isMobile.current) startLoop();
     });
+
     return () => { cancelled = true; };
-  }, [publicId, startLoop]);
+  }, [publicId, startLoop, drawToCanvas]);
 
   // ── Desktop hover handlers ───────────────────────────────────────
   const handleMouseEnter = useCallback(() => {
     if (isMobile.current) return;
     if (modeRef.current === "leaving") {
-      // Mid-reverse — just resume looping from the current frame, no jump
       modeRef.current = "loop";
-      if (canvasRef.current) canvasRef.current.style.opacity = "1";
-      if (imgRef.current) imgRef.current.style.opacity = "0";
+      if (animCanvasRef.current) animCanvasRef.current.style.opacity = "1";
       return;
     }
     startLoop();
@@ -912,7 +911,6 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
   const handleMouseLeave = useCallback(() => {
     if (isMobile.current) return;
     if (modeRef.current === "idle") return;
-    // Walk smoothly back to frame 0 from wherever we are right now, then hide
     directionRef.current = "reverse";
     modeRef.current = "leaving";
   }, []);
@@ -929,20 +927,33 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3" }}
     >
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
-        {/* Static poster — shown on desktop idle, hidden once frames take over */}
-        <img
-          ref={imgRef}
-          src={img}
-          alt={label}
-          className="w-full h-full object-cover scale-[1.02]"
-          style={{ transition: "opacity 0.25s ease", opacity: 1, position: "absolute", inset: 0 }}
-        />
-        {/* Frame-sequence canvas — ping-pongs on mobile always; on desktop while hovered */}
+        {/* Frame 0 poster — painted via canvas once frames load, no static PNG */}
         <canvas
-          ref={canvasRef}
-          className="w-full h-full object-cover scale-[1.02]"
-          style={{ transition: "opacity 0.25s ease", opacity: 0, position: "absolute", inset: 0 }}
+          ref={posterCanvasRef}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
         />
+        {/* Animated ping-pong canvas — crossfades in over poster */}
+        <canvas
+          ref={animCanvasRef}
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%",
+            opacity: 0, transition: "opacity 0.3s ease",
+          }}
+        />
+        {/* Loading indicator — same style as the cinematic hero */}
+        <div
+          ref={loadWrapRef}
+          style={{
+            position: "absolute", inset: 0, display: "flex",
+            flexDirection: "column", alignItems: "center", justifyContent: "center",
+            gap: 8, background: "rgba(0,0,0,0.55)", borderRadius: "inherit",
+          }}
+        >
+          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase" }}>Loading</p>
+          <div style={{ width: 80, height: 2, background: "rgba(255,255,255,0.12)", borderRadius: 2 }}>
+            <div ref={loadBarRef} style={{ height: "100%", width: "0%", background: "#C8A882", borderRadius: 2, transition: "width 0.08s linear" }} />
+          </div>
+        </div>
       </div>
     </button>
   );
