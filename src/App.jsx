@@ -453,43 +453,46 @@ function TiltCard({ product, onOpen, isWishlisted, onToggleWish }) {
 function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, setQuery }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
-    <header className="sticky top-0 z-40" style={{ background: "#5C3D2A" }}>
+    <header className="sticky top-0 z-40" style={{
+      background: "#3D2E24",
+      backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E\")",
+    }}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-        <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: C.bgSoft }}>MBZ</button>
+        <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: "#C8A882" }}>MBZ</button>
 
-        <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "rgba(251,246,236,0.7)" }}>
+        <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "rgba(200,168,130,0.7)" }}>
           {Object.entries(CATEGORY_META).map(([key, meta]) => (
             <button key={key} onClick={() => onNav("category", key)} className="hover:opacity-100 transition-opacity" style={{ color: "inherit" }}>{meta.label}</button>
           ))}
         </nav>
 
         <div className="flex items-center gap-2">
-          <button onClick={() => setSearchOpen((s) => !s)} className="w-9 h-9 rounded-full flex items-center justify-center transition-colors" style={{ color: C.bgSoft }}><Search size={18} /></button>
-          <button onClick={onCart} className="relative w-9 h-9 rounded-full flex items-center justify-center" style={{ color: C.bgSoft }}>
+          <button onClick={() => setSearchOpen((s) => !s)} className="w-9 h-9 rounded-full flex items-center justify-center transition-colors" style={{ color: "#C8A882" }}><Search size={18} /></button>
+          <button onClick={onCart} className="relative w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
             <ShoppingBag size={18} />
             {cartCount > 0 && (
               <span className="absolute -top-1 -right-1 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#15c2c9", color: C.maroonDeep }}>{cartCount}</span>
             )}
           </button>
-          <button onClick={() => setMobileOpen((m) => !m)} className="md:hidden w-9 h-9 rounded-full flex items-center justify-center" style={{ color: C.bgSoft }}>
+          <button onClick={() => setMobileOpen((m) => !m)} className="md:hidden w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
             {mobileOpen ? <X size={18} /> : <Menu size={18} />}
           </button>
         </div>
       </div>
 
       {searchOpen && (
-        <div className="border-t px-5 sm:px-8 py-3" style={{ borderColor: "rgba(251,246,236,0.15)", background: "#3D2518" }}>
+        <div className="border-t px-5 sm:px-8 py-3" style={{ borderColor: "rgba(200,168,130,0.15)", background: "#2A1F17" }}>
           <div className="max-w-7xl mx-auto flex items-center gap-2">
-            <Search size={16} style={{ color: "rgba(251,246,236,0.5)" }} />
-            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products..." className="bg-transparent outline-none text-sm w-full" style={{ color: C.bgSoft }} />
+            <Search size={16} style={{ color: "rgba(200,168,130,0.5)" }} />
+            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products..." className="bg-transparent outline-none text-sm w-full" style={{ color: "#C8A882" }} />
           </div>
         </div>
       )}
 
       {mobileOpen && (
-        <div className="md:hidden border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "rgba(251,246,236,0.15)", background: "#3D2518" }}>
+        <div className="md:hidden border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "rgba(200,168,130,0.15)", background: "#2A1F17" }}>
           {Object.entries(CATEGORY_META).map(([key, meta]) => (
-            <button key={key} onClick={() => { onNav("category", key); setMobileOpen(false); }} className="text-left text-sm" style={{ color: "rgba(251,246,236,0.85)" }}>{meta.label}</button>
+            <button key={key} onClick={() => { onNav("category", key); setMobileOpen(false); }} className="text-left text-sm" style={{ color: "rgba(200,168,130,0.85)" }}>{meta.label}</button>
           ))}
         </div>
       )}
