@@ -336,7 +336,9 @@ function CinematicHero({ onNav }) {
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }} />
 
-        {/* No fade needed — bg colour matches video background */}
+        {/* Short fade only at very bottom — below the clothes, not on them */}
+        <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
+          style={{ zIndex: 2, height: "12%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
