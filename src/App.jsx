@@ -163,8 +163,8 @@ function drawImageCover(ctx, img, W, H) {
   if (!img || !img.naturalWidth) return;
   const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
   const dx    = (W - img.naturalWidth  * scale) / 2;
-  // +8% shifts image down so cloth pile sits lower-centre
-  const dy    = (H - img.naturalHeight * scale) / 2 + H * 0.08;
+  // -5% nudges image up so it fills from the top
+  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.05;
   // Clip: only paint the top 88% of the canvas, cutting the watermark strip
   ctx.save();
   ctx.beginPath();
@@ -352,7 +352,7 @@ function CinematicHero({ onNav }) {
         </div>
 
         {/* Text — shifted up so heading+buttons float just above the cloth pile */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-10%)" }}>
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(5%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
               <h1 className="text-3xl sm:text-5xl font-black leading-[0.9] mx-auto" style={{ color: C.maroon }}>
@@ -810,7 +810,7 @@ function CategorySection({ onNav }) {
                   <img
                     src={img}
                     alt={label}
-                    className="w-full h-full object-cover scale-110 transition-transform duration-500 group-hover:scale-115"
+                    className="w-full h-full object-cover scale-[1.02] transition-transform duration-500 group-hover:scale-[1.05]"
                   />
                 </div>
               </button>
