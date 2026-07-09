@@ -330,7 +330,7 @@ function CinematicHero({ onNav }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ height: "180vh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "220vh", position: "relative" }}>
       <div className="sticky top-0 overflow-hidden" style={{ height: "100vh", fontFamily: FONT_BODY }}>
 
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
@@ -338,7 +338,7 @@ function CinematicHero({ onNav }) {
 
         {/* Bottom fade — covers watermark strip and blends video into page bg */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ zIndex: 2, height: "40%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 65%)` }} />
+          style={{ zIndex: 2, height: "50%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 55%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
@@ -829,7 +829,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-22vh" }}>
+      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-30vh" }}>
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
