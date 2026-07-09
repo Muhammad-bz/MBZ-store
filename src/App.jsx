@@ -733,6 +733,9 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
   const reverseRef = useRef(null); // rAF id for reverse playback
   const stateRef   = useRef("idle"); // "idle" | "playing" | "reversing"
 
+  // Detect mobile once per mount — no need to re-check per interaction
+  const isMobile = useRef(typeof window !== "undefined" && window.innerWidth < 768);
+
   const cancelReverse = () => {
     if (reverseRef.current) {
       cancelAnimationFrame(reverseRef.current);
@@ -740,7 +743,25 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
     }
   };
 
+  // ── Mobile: autoplay with ping-pong loop ─────────────────────────
+  useEffect(() => {
+    if (!isMobile.current) return;
+    const vid = videoRef.current;
+    const img = imgRef.current;
+    if (!vid || !img) return;
+
+    // Show video, hide static image immediately
+    vid.style.opacity = "1";
+    img.style.opacity = "0";
+
+    // Play forward — reverse is handled in handleEnded below
+    stateRef.current = "playing";
+    vid.play().catch(() => {});
+  }, []);
+
+  // ── Desktop: hover → play forward, leave → reverse ───────────────
   const handleMouseEnter = () => {
+    if (isMobile.current) return; // no-op on mobile
     const vid = videoRef.current;
     if (!vid) return;
     cancelReverse();
@@ -750,12 +771,12 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
     vid.style.opacity  = "1";
     imgRef.current.style.opacity = "0";
 
-    // Always play from wherever it is (start if idle, resume if mid-reverse)
     vid.playbackRate = 1;
     vid.play().catch(() => {});
   };
 
   const handleMouseLeave = () => {
+    if (isMobile.current) return; // no-op on mobile
     const vid = videoRef.current;
     if (!vid) return;
     vid.pause();
@@ -779,9 +800,33 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
     reverseRef.current = requestAnimationFrame(step);
   };
 
-  // When video naturally ends, start reversing
+  // Both mobile and desktop: when video ends, reverse back frame-by-frame
+  // When reverse hits 0, play forward again — creating a seamless ping-pong loop
   const handleEnded = () => {
-    handleMouseLeave();
+    const vid = videoRef.current;
+    if (!vid) return;
+
+    if (isMobile.current) {
+      // Mobile ping-pong: reverse, then play forward again, forever
+      cancelReverse();
+      stateRef.current = "reversing";
+      const step = () => {
+        if (stateRef.current !== "reversing") return;
+        const newTime = vid.currentTime - 0.033;
+        if (newTime <= 0) {
+          vid.currentTime = 0;
+          stateRef.current = "playing";
+          vid.play().catch(() => {});
+          return;
+        }
+        vid.currentTime = newTime;
+        reverseRef.current = requestAnimationFrame(step);
+      };
+      reverseRef.current = requestAnimationFrame(step);
+    } else {
+      // Desktop: reverse back to idle (existing behaviour)
+      handleMouseLeave();
+    }
   };
 
   return (
@@ -794,7 +839,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3" }}
     >
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
-        {/* Static image — always rendered, fades out on hover */}
+        {/* Static image — always rendered on desktop, hidden on mobile */}
         <img
           ref={imgRef}
           src={img}
@@ -802,13 +847,14 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
           className="w-full h-full object-cover scale-[1.02]"
           style={{ transition: "opacity 0.25s ease", opacity: 1, position: "absolute", inset: 0 }}
         />
-        {/* Hover video — fades in on hover, same scale as image */}
+        {/* Desktop: fades in on hover | Mobile: always visible, loops constantly */}
         <video
           ref={videoRef}
           src={video}
           muted
           playsInline
           preload="auto"
+          loop={false}   // ping-pong handled manually via handleEnded
           onEnded={handleEnded}
           className="w-full h-full object-cover scale-[1.02]"
           style={{ transition: "opacity 0.25s ease", opacity: 0, position: "absolute", inset: 0 }}
