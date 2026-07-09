@@ -166,7 +166,7 @@ function drawImageCover(ctx, img, W, H) {
   // Clip: only paint the top 88% of the canvas, cutting the watermark strip
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, 0, W, Math.round(H * 0.95));
+  ctx.rect(0, 0, W, Math.round(H * 1.0));
   ctx.clip();
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
   ctx.restore();
@@ -336,9 +336,9 @@ function CinematicHero({ onNav }) {
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }} />
 
-        {/* Bottom fade — only covers the clipped Kling AI strip */}
+        {/* Bottom fade — starts above clothes base, covers Kling AI logo */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ zIndex: 2, height: "8%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
+          style={{ zIndex: 2, height: "30%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 75%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
