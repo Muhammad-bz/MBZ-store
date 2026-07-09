@@ -9,8 +9,8 @@ import {
    THEME
 ══════════════════════════════════════════════════════════ */
 const C = {
-  bg:         "#F0EDE7",
-  bgSoft:     "#F7F4EF",
+  bg:         "#ECEAE5",
+  bgSoft:     "#F4F1EC",
   ink:        "#3E1A0B",
   inkSoft:    "#6B3A22",
   maroon:     "#4A1B0C",
@@ -338,7 +338,7 @@ function CinematicHero({ onNav }) {
 
         {/* Bottom fade — blends video floor into page bg */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ zIndex: 2, height: "35%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
+          style={{ zIndex: 2, height: "55%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 85%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
