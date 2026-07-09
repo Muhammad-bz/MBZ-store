@@ -831,7 +831,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-26vh", paddingTop: "26vh", pointerEvents: "none" }}>
+      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-26vh", pointerEvents: "none" }}>
         <div style={{ pointerEvents: "auto" }}>
         <CategorySection onNav={onNav} />
 
