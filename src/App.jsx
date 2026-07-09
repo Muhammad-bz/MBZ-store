@@ -837,6 +837,9 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
       <CinematicHero onNav={onNav} />
 
       <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-30vh" }}>
+        {/* Top fade so bg blends up from transparent */}
+        <div className="absolute top-0 left-0 right-0 pointer-events-none"
+          style={{ height: "18vh", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)`, zIndex: 0 }} />
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
