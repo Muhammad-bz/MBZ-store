@@ -330,7 +330,7 @@ function CinematicHero({ onNav }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ height: "220vh", position: "relative" }}>
+    <div ref={containerRef} style={{ height: "220vh", position: "relative", zIndex: 20 }}>
       <div className="sticky top-0 overflow-hidden" style={{ height: "100vh", fontFamily: FONT_BODY }}>
 
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
@@ -836,10 +836,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-30vh" }}>
-        {/* Top fade so bg rises gently from transparent behind panels */}
-        <div className="absolute top-0 left-0 right-0 pointer-events-none"
-          style={{ height: "12vh", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)`, zIndex: 0 }} />
+      <div style={{ position: "relative", zIndex: 10, background: C.bg }}>
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
