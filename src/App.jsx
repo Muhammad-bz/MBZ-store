@@ -353,29 +353,33 @@ function CinematicHero({ onNav }) {
         <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-5%)" }}>
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
-              <h1 className="text-4xl sm:text-6xl font-black leading-[0.85] mx-auto" style={{ color: C.maroon }}>
+              <h1 className="text-4xl sm:text-6xl font-black leading-[0.85] mx-auto" style={{ color: "#6B3A22" }}>
                 {SCENES[0].lines.map((line, i) => {
                   const isAccent = line === "Motion.";
                   return (
                     <span key={i} className="block"
-                      style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: C.inkSoft } : undefined}>
+                      style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: "#C8A882" } : undefined}>
                       {line}
                     </span>
                   );
                 })}
               </h1>
-              <p className="mt-3 max-w-md mx-auto text-xs sm:text-sm font-medium" style={{ color: C.inkSoft }}>
+              <p className="mt-3 max-w-md mx-auto text-xs sm:text-sm font-medium" style={{ color: "#3D2E24" }}>
                 {SCENES[0].sub}
               </p>
               <div className="mt-4 flex flex-row items-center justify-center gap-3">
                 <button onClick={() => onNav("category", "shoes")}
                   className="px-5 py-2.5 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
-                  style={{ background: "#5C3D2A", color: C.bgSoft }}>
+                  style={{
+                    background: "#3D2E24",
+                    backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E\")",
+                    color: "#C8A882"
+                  }}>
                   Order Now <ArrowRight size={16} />
                 </button>
                 <button onClick={() => onNav("category", "apparel")}
                   className="px-5 py-2.5 rounded-full text-sm font-medium border"
-                  style={{ borderColor: C.maroon, color: C.maroon }}>
+                  style={{ borderColor: "#3D2E24", color: "#3D2E24" }}>
                   Explore Apparel
                 </button>
               </div>
