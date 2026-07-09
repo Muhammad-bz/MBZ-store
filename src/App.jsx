@@ -9,8 +9,8 @@ import {
    THEME
 ══════════════════════════════════════════════════════════ */
 const C = {
-  bg:         "#EDEAE5",
-  bgSoft:     "#F4F1EC",
+  bg:         "#F0EDE7",
+  bgSoft:     "#F7F4EF",
   ink:        "#3E1A0B",
   inkSoft:    "#6B3A22",
   maroon:     "#4A1B0C",
@@ -336,9 +336,9 @@ function CinematicHero({ onNav }) {
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }} />
 
-        {/* Short fade only at very bottom — below the clothes, not on them */}
+        {/* Bottom fade — covers video's bottom gradient and blends into page bg */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ zIndex: 2, height: "12%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
+          style={{ zIndex: 2, height: "30%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
@@ -837,9 +837,9 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
       <CinematicHero onNav={onNav} />
 
       <div style={{ position: "relative", zIndex: 10, background: C.bg, marginTop: "-30vh" }}>
-        {/* Top fade so bg blends up from transparent */}
+        {/* Top fade so bg rises gently from transparent behind panels */}
         <div className="absolute top-0 left-0 right-0 pointer-events-none"
-          style={{ height: "18vh", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)`, zIndex: 0 }} />
+          style={{ height: "12vh", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)`, zIndex: 0 }} />
         <CategorySection onNav={onNav} />
 
         <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
