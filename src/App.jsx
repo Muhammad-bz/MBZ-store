@@ -728,106 +728,126 @@ const CATEGORY_CARDS = {
 /* ── Per-panel video hover card ─────────────────────────────────── */
 function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
   const { label, img, video } = card;
-  const videoRef   = useRef(null);
-  const imgRef     = useRef(null);
-  const reverseRef = useRef(null); // rAF id for reverse playback
-  const stateRef   = useRef("idle"); // "idle" | "playing" | "reversing"
+  const videoRef    = useRef(null);
+  const imgRef      = useRef(null);
+  const rafRef      = useRef(null);   // rAF id for reverse playback
+  // stateRef values: "idle" | "playing" | "reversing" | "leaving"
+  // "leaving" = mouse left while playing — reverse to 0 then hide
+  const stateRef    = useRef("idle");
+  const isHoveredRef = useRef(false); // tracks live hover state on desktop
 
-  // Detect mobile once per mount — no need to re-check per interaction
+  // Detect mobile once per mount
   const isMobile = useRef(typeof window !== "undefined" && window.innerWidth < 768);
 
-  const cancelReverse = () => {
-    if (reverseRef.current) {
-      cancelAnimationFrame(reverseRef.current);
-      reverseRef.current = null;
-    }
+  const cancelRaf = () => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
   };
 
-  // ── Mobile: autoplay with ping-pong loop ─────────────────────────
+  // ── Shared reverse stepper ────────────────────────────────────────
+  // mode "pingpong" → when reaching 0, play forward again (mobile + desktop hover loop)
+  // mode "leave"    → when reaching 0, hide video and show image (desktop mouse-left)
+  const startReverse = useCallback((mode) => {
+    const vid = videoRef.current;
+    if (!vid) return;
+    cancelRaf();
+    vid.pause();
+    stateRef.current = "reversing";
+
+    // Adaptive step: aim for ~60 fps rewind at natural 1× speed
+    // 0.033 s per rAF tick ≈ 2 s video reversed in 2 s — same duration as forward
+    const STEP = 0.033;
+
+    const step = () => {
+      // If state changed externally (e.g. hover re-entered mid-reverse), abort
+      if (stateRef.current !== "reversing") return;
+
+      const newTime = vid.currentTime - STEP;
+
+      if (newTime <= 0) {
+        vid.currentTime = 0;
+
+        if (mode === "leave") {
+          // Mouse already left — hide video, restore image
+          vid.style.opacity            = "0";
+          if (imgRef.current) imgRef.current.style.opacity = "1";
+          stateRef.current = "idle";
+        } else {
+          // ping-pong: hit the start — play forward again seamlessly
+          stateRef.current = "playing";
+          vid.play().catch(() => {});
+        }
+        return;
+      }
+
+      vid.currentTime = newTime;
+      rafRef.current  = requestAnimationFrame(step);
+    };
+
+    rafRef.current = requestAnimationFrame(step);
+  }, []);
+
+  // ── Mobile: autoplay ping-pong from mount ────────────────────────
   useEffect(() => {
     if (!isMobile.current) return;
     const vid = videoRef.current;
-    const img = imgRef.current;
-    if (!vid || !img) return;
+    if (!vid || !imgRef.current) return;
 
-    // Show video, hide static image immediately
-    vid.style.opacity = "1";
-    img.style.opacity = "0";
+    // Show video immediately; hide static image
+    vid.style.opacity          = "1";
+    imgRef.current.style.opacity = "0";
 
-    // Play forward — reverse is handled in handleEnded below
+    stateRef.current = "playing";
+    vid.play().catch(() => {});
+    // onEnded → startReverse("pingpong") → play → onEnded → … forever
+  }, []);
+
+  // ── Desktop: hover handlers ───────────────────────────────────────
+  const handleMouseEnter = useCallback(() => {
+    if (isMobile.current) return;
+    const vid = videoRef.current;
+    if (!vid || !imgRef.current) return;
+
+    isHoveredRef.current = true;
+    cancelRaf();
+
+    // Show video
+    vid.style.opacity          = "1";
+    imgRef.current.style.opacity = "0";
+
+    // If already mid-video (e.g. re-entered while reversing), just resume forward
+    vid.playbackRate = 1;
     stateRef.current = "playing";
     vid.play().catch(() => {});
   }, []);
 
-  // ── Desktop: hover → play forward, leave → reverse ───────────────
-  const handleMouseEnter = () => {
-    if (isMobile.current) return; // no-op on mobile
-    const vid = videoRef.current;
-    if (!vid) return;
-    cancelReverse();
-    stateRef.current = "playing";
-
-    // Cross-fade: show video, hide image
-    vid.style.opacity  = "1";
-    imgRef.current.style.opacity = "0";
-
-    vid.playbackRate = 1;
-    vid.play().catch(() => {});
-  };
-
-  const handleMouseLeave = () => {
-    if (isMobile.current) return; // no-op on mobile
-    const vid = videoRef.current;
-    if (!vid) return;
-    vid.pause();
-    stateRef.current = "reversing";
-
-    // Reverse frame-by-frame via rAF at ~60 fps stepping back ~1/30s per frame
-    const step = () => {
-      if (stateRef.current !== "reversing") return;
-      const newTime = vid.currentTime - 0.033;
-      if (newTime <= 0) {
-        vid.currentTime = 0;
-        // Cross-fade back: hide video, show image
-        vid.style.opacity            = "0";
-        imgRef.current.style.opacity = "1";
-        stateRef.current = "idle";
-        return;
-      }
-      vid.currentTime = newTime;
-      reverseRef.current = requestAnimationFrame(step);
-    };
-    reverseRef.current = requestAnimationFrame(step);
-  };
-
-  // Both mobile and desktop: when video ends, reverse back frame-by-frame
-  // When reverse hits 0, play forward again — creating a seamless ping-pong loop
-  const handleEnded = () => {
+  const handleMouseLeave = useCallback(() => {
+    if (isMobile.current) return;
     const vid = videoRef.current;
     if (!vid) return;
 
+    isHoveredRef.current = false;
+
+    if (stateRef.current === "idle") return; // nothing playing, nothing to do
+
+    // If currently playing forward, reverse back to start then hide
+    // If currently reversing in ping-pong mode, switch mode to "leave" so it
+    // hides at 0 instead of looping — we do this by just restarting with "leave"
+    startReverse("leave");
+  }, [startReverse]);
+
+  // ── onEnded: video reached the end ───────────────────────────────
+  const handleEnded = useCallback(() => {
     if (isMobile.current) {
-      // Mobile ping-pong: reverse, then play forward again, forever
-      cancelReverse();
-      stateRef.current = "reversing";
-      const step = () => {
-        if (stateRef.current !== "reversing") return;
-        const newTime = vid.currentTime - 0.033;
-        if (newTime <= 0) {
-          vid.currentTime = 0;
-          stateRef.current = "playing";
-          vid.play().catch(() => {});
-          return;
-        }
-        vid.currentTime = newTime;
-        reverseRef.current = requestAnimationFrame(step);
-      };
-      reverseRef.current = requestAnimationFrame(step);
+      // Mobile: always ping-pong back and forth
+      startReverse("pingpong");
     } else {
-      // Desktop: reverse back to idle (existing behaviour)
-      handleMouseLeave();
+      // Desktop: still hovered? ping-pong. Mouse left? leave.
+      startReverse(isHoveredRef.current ? "pingpong" : "leave");
     }
-  };
+  }, [startReverse]);
+
+  // ── Cleanup on unmount ───────────────────────────────────────────
+  useEffect(() => () => cancelRaf(), []);
 
   return (
     <button
@@ -839,7 +859,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3" }}
     >
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
-        {/* Static image — always rendered on desktop, hidden on mobile */}
+        {/* Static image — shown on desktop idle, hidden on mobile */}
         <img
           ref={imgRef}
           src={img}
@@ -847,14 +867,14 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
           className="w-full h-full object-cover scale-[1.02]"
           style={{ transition: "opacity 0.25s ease", opacity: 1, position: "absolute", inset: 0 }}
         />
-        {/* Desktop: fades in on hover | Mobile: always visible, loops constantly */}
+        {/* Video: ping-pong on mobile always; ping-pong on desktop while hovered */}
         <video
           ref={videoRef}
           src={video}
           muted
           playsInline
           preload="auto"
-          loop={false}   // ping-pong handled manually via handleEnded
+          loop={false}
           onEnded={handleEnded}
           className="w-full h-full object-cover scale-[1.02]"
           style={{ transition: "opacity 0.25s ease", opacity: 0, position: "absolute", inset: 0 }}
