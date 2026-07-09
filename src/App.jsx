@@ -330,15 +330,15 @@ function CinematicHero({ onNav }) {
   }, []);
 
   return (
-    <div ref={containerRef} style={{ height: "220vh", position: "relative", zIndex: 20 }}>
+    <div ref={containerRef} style={{ height: "220vh", position: "relative" }}>
       <div className="sticky top-0 overflow-hidden" style={{ height: "100vh", fontFamily: FONT_BODY }}>
 
         <canvas ref={canvasRef} className="absolute inset-0 z-0"
           style={{ width: "100%", height: "100%", imageRendering: "auto" }} />
 
-        {/* Bottom fade — dissolves video into page bg */}
+        {/* Bottom fade — blends video floor into page bg */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none"
-          style={{ zIndex: 2, height: "40%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 80%)` }} />
+          style={{ zIndex: 2, height: "20%", background: `linear-gradient(to bottom, transparent 0%, ${C.bg} 100%)` }} />
 
         {/* Loading overlay */}
         <div ref={loadWrapRef} className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4"
@@ -798,8 +798,8 @@ function CategorySection({ onNav }) {
   }, []);
 
   return (
-    <div style={{ overflow: "visible", background: C.bg }}>
-      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 pt-0 pb-6">
+    <div style={{ overflow: "hidden" }}>
+      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => {
             const { label, img } = card;
@@ -836,10 +836,10 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
     <div>
       <CinematicHero onNav={onNav} />
 
-      <div style={{ position: "relative", zIndex: 25, marginTop: "-30vh" }}>
+      <div style={{ position: "relative", zIndex: 10, marginTop: "-30vh", background: `linear-gradient(to bottom, transparent 0%, transparent 28%, ${C.bg} 38%)` }}>
         <CategorySection onNav={onNav} />
 
-        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10" style={{ background: C.bg }}>
+        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
           <div className="flex items-end justify-between mb-6">
             <h2 className="text-2xl font-black" style={{ color: C.ink }}>Featured</h2>
             <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
