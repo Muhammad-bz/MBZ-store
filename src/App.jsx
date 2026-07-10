@@ -906,7 +906,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
         width: "100%", aspectRatio: "4/3", touchAction: "pan-y",
         background: "#2E1A0E", border: "none", padding: 0,
         position: "relative", display: "block",
-        borderRadius: "2.5rem", overflow: "hidden",
+        borderRadius: "2rem", overflow: "hidden",
         isolation: "isolate",
         WebkitMaskImage: "-webkit-radial-gradient(white, black)",
         transform: "translateZ(0)",
