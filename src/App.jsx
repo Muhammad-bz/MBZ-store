@@ -438,7 +438,7 @@ function BackButton({ onBack }) {
 }
 
 
-function TiltCard({ product, onOpen, isWishlisted, onToggleWish }) {
+function TiltCard({ product, onOpen, isWishlisted, onToggleWish, darkBg = false }) {
   const ref = useRef(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0, glowX: 50, glowY: 50 });
 
@@ -481,10 +481,10 @@ function TiltCard({ product, onOpen, isWishlisted, onToggleWish }) {
       </div>
       <div className="mt-3 flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium" style={{ color: C.ink }}>{product.name}</p>
-          <p className="text-xs capitalize" style={{ color: C.inkSoft, opacity: 0.7 }}>{product.category}</p>
+          <p className="text-sm font-medium" style={{ color: darkBg ? "#C8A882" : C.ink }}>{product.name}</p>
+          <p className="text-xs capitalize" style={{ color: darkBg ? "rgba(200,168,130,0.55)" : C.inkSoft, opacity: darkBg ? 1 : 0.7 }}>{product.category}</p>
         </div>
-        <p className="text-sm font-semibold" style={{ color: C.ink }}>{fmt(product.price)}</p>
+        <p className="text-sm font-semibold" style={{ color: darkBg ? "#C8A882" : C.ink }}>{fmt(product.price)}</p>
       </div>
     </div>
   );
@@ -1175,15 +1175,13 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
       <div style={{ position: "relative", zIndex: 10, marginTop: "-30vh", background: `linear-gradient(to bottom, transparent 0%, transparent 28%, ${C.bg} 38%)` }}>
         <CategorySection onNav={onNav} />
 
-        <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
-          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
+        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
           <div className="flex items-end justify-between mb-6">
-            <h2 className="text-2xl font-black" style={{ color: "#C8A882" }}>Featured</h2>
-            <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: "rgba(200,168,130,0.6)" }}>View all <ArrowRight size={14} /></button>
+            <h2 className="text-2xl font-black" style={{ color: C.ink }}>Featured</h2>
+            <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-            {featured.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} />))}
-          </div>
+            {featured.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />))}
           </div>
         </section>
 
@@ -1533,7 +1531,7 @@ function Footer() {
   return (
     <footer style={{ position: "relative" }}>
       <div style={{
-        background: `linear-gradient(to bottom, #2E1508 0%, #1E0D06 100%)`,
+        background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 35%, #1E0D06 100%)`,
         boxShadow: "0 -1px 0 rgba(200,140,60,0.10)",
       }}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 grid sm:grid-cols-4 gap-10">
