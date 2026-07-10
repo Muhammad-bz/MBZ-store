@@ -903,11 +903,11 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onContextMenu={(e) => e.preventDefault()}
-      className="relative rounded-2xl text-left"
+      className="relative text-left"
       style={{ opacity: 0, aspectRatio: "4/3", touchAction: "pan-y", background: "none", border: "none" }}
     >
-      {/* Invisible clipping frame — rounds and crops the canvas with no background */}
-      <div style={{ position: "absolute", inset: "-1px", borderRadius: "1rem", overflow: "hidden" }}>
+      {/* Canvas fills the button entirely */}
+      <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: "1rem" }}>
         <canvas
           ref={canvasRef}
           onContextMenu={(e) => e.preventDefault()}
@@ -917,12 +917,12 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
             display: "block",
           }}
         />
-        {/* Rounded corner mask — sits on top of the canvas, hides the video's own light edges */}
-        <div style={{
-          position: "absolute", inset: 0, borderRadius: "1rem", pointerEvents: "none",
-          boxShadow: `inset 0 0 0 2px #ECEAE5`,
-        }} />
       </div>
+      {/* Picture frame — sits on top, covers the video's own white edges with bg colour + rounds corners */}
+      <div style={{
+        position: "absolute", inset: 0, borderRadius: "1rem", pointerEvents: "none",
+        boxShadow: "inset 0 0 0 6px #ECEAE5",
+      }} />
     </button>
   );
 }
