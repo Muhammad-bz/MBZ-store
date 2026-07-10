@@ -905,9 +905,10 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       style={{
         width: "100%", aspectRatio: "4/3", touchAction: "pan-y",
         background: "none", border: "none", padding: 0,
-        position: "relative", display: "block",
+        position: "relative", display: "block", borderRadius: "1rem",
       }}
     >
+      {/* Canvas clipped to rounded corners */}
       <div style={{ position: "absolute", inset: 0, borderRadius: "1rem", overflow: "hidden" }}>
         <canvas
           ref={canvasRef}
@@ -919,6 +920,11 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
           }}
         />
       </div>
+      {/* Frame: painted ON TOP of the clip div, covers the video's baked-in white corners */}
+      <div style={{
+        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: "1rem",
+        boxShadow: "inset 0 0 0 12px #ECEAE5",
+      }} />
     </button>
   );
 }
