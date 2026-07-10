@@ -906,18 +906,20 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       style={{
         opacity: 0, aspectRatio: "4/3", touchAction: "pan-y",
         background: "none", border: "none", padding: 0,
-        position: "relative", borderRadius: "1rem", overflow: "hidden", display: "block",
+        position: "relative", display: "block",
       }}
     >
-      <canvas
-        ref={canvasRef}
-        onContextMenu={(e) => e.preventDefault()}
-        style={{
-          position: "absolute", inset: 0, width: "100%", height: "100%",
-          touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
-          display: "block", clipPath: "inset(0 round 1rem)",
-        }}
-      />
+      <div style={{ position: "absolute", inset: 0, borderRadius: "1rem", overflow: "hidden" }}>
+        <canvas
+          ref={canvasRef}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%",
+            touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
+            display: "block",
+          }}
+        />
+      </div>
     </button>
   );
 }
