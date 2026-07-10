@@ -156,17 +156,17 @@ function preloadFrames(onProgress) {
 }
 
 // object-fit: cover — image drawn at natural cover scale.
-// Canvas clipped to top 88% to hide Kling AI watermark without scaling.
-function drawImageCover(ctx, img, W, H) {
+// nudgeY: fraction of H added to dy (negative = shift up, positive = shift down).
+// Hero canvas: nudgeY = -0.08 shifts up to hide Kling AI watermark at bottom.
+// Panel cards: nudgeY = 0 — perfectly centred, no cropping.
+function drawImageCover(ctx, img, W, H, nudgeY = 0) {
   if (!img || !img.naturalWidth) return;
   const scale = Math.max(W / img.naturalWidth, H / img.naturalHeight);
   const dx    = (W - img.naturalWidth  * scale) / 2;
-  // -8% nudges image up so it fills from the top
-  const dy    = (H - img.naturalHeight * scale) / 2 - H * 0.08;
-  // Clip: only paint the top 88% of the canvas, cutting the watermark strip
+  const dy    = (H - img.naturalHeight * scale) / 2 + H * nudgeY;
   ctx.save();
   ctx.beginPath();
-  ctx.rect(0, 0, W, Math.round(H * 1.0));
+  ctx.rect(0, 0, W, H);
   ctx.clip();
   ctx.drawImage(img, dx, dy, img.naturalWidth * scale, img.naturalHeight * scale);
   ctx.restore();
@@ -284,11 +284,11 @@ function CinematicHero({ onNav }) {
 
         if (frames[loIdx]?.naturalWidth) {
           ctx.globalAlpha = 1;
-          drawImageCover(ctx, frames[loIdx], W, H);
+          drawImageCover(ctx, frames[loIdx], W, H, -0.08);
         }
         if (hiIdx !== loIdx && frames[hiIdx]?.naturalWidth && blend > 0.001) {
           ctx.globalAlpha = blend;
-          drawImageCover(ctx, frames[hiIdx], W, H);
+          drawImageCover(ctx, frames[hiIdx], W, H, -0.08);
           ctx.globalAlpha = 1;
         }
         // Canvas stays at opacity 1 — last frame holds permanently
@@ -793,10 +793,10 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
     const blend  = rawPos - loIdx;
     if (!frames[loIdx]) return; // frame not loaded yet — skip draw
     ctx.globalAlpha = 1;
-    drawImageCover(ctx, frames[loIdx], W, H);
+    drawImageCover(ctx, frames[loIdx], W, H, 0);
     if (hiIdx !== loIdx && frames[hiIdx] && blend > 0.001) {
       ctx.globalAlpha = blend;
-      drawImageCover(ctx, frames[hiIdx], W, H);
+      drawImageCover(ctx, frames[hiIdx], W, H, 0);
       ctx.globalAlpha = 1;
     }
   };
@@ -904,27 +904,23 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       onContextMenu={(e) => e.preventDefault()}
       style={{
         width: "100%", aspectRatio: "4/3", touchAction: "pan-y",
-        background: "none", border: "none", padding: 0,
-        position: "relative", display: "block", borderRadius: "1rem",
+        background: "#2E1A0E", border: "none", padding: 0,
+        position: "relative", display: "block",
+        borderRadius: "1.25rem", overflow: "hidden",
       }}
     >
-      {/* Canvas clipped to rounded corners */}
-      <div style={{ position: "absolute", inset: 0, borderRadius: "1rem", overflow: "hidden" }}>
-        <canvas
-          ref={canvasRef}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{
-            position: "absolute", inset: 0, width: "100%", height: "100%",
-            touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
-            display: "block",
-          }}
-        />
-      </div>
-      {/* Frame: painted ON TOP of the clip div, covers the video's baked-in white corners */}
-      <div style={{
-        position: "absolute", inset: 0, pointerEvents: "none", borderRadius: "1rem",
-        boxShadow: "inset 0 0 0 12px #ECEAE5",
-      }} />
+      {/* Canvas — fills the button perfectly, clipped by overflow:hidden on parent */}
+      <canvas
+        ref={canvasRef}
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
+          display: "block",
+        }}
+      />
+
+
     </button>
   );
 }
