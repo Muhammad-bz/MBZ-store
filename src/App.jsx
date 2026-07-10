@@ -132,50 +132,42 @@ const CLOUDINARY_BASE = "https://res.cloudinary.com/leu4dssl/video/upload";
 const MOBILE_ID       = "v1782988492/lv_0_20260702132747_dz3imr";
 const DESKTOP_ID      = "v1782990615/lv_0_20260702160728_bxppy7";
 const VIDEO_DURATION  = 3;
-const FRAME_COUNT     = 120; // ↑ from 90 — noticeably smoother inter-frame blend
+const FRAME_COUNT     = 60; // 60 frames — half the requests, still smooth with inter-frame blending
 
-// Build frame URL — mobile flag passed in, not re-computed every call
+// Build frame URL — lower res + good quality = much faster download
 const FRAME_PATH = (n, mobile) => {
   const t  = ((n / (FRAME_COUNT - 1)) * VIDEO_DURATION).toFixed(3);
   const id = mobile ? MOBILE_ID : DESKTOP_ID;
   const tr = mobile
-    ? "w_1080,h_1920,c_fill,g_center,e_brightness:8,q_auto:best"
-    : "w_1920,h_1080,c_fill,g_center,e_brightness:8,q_auto:best";
+    ? "w_750,h_1334,c_fill,g_center,e_brightness:8,q_auto:good"
+    : "w_1280,h_720,c_fill,g_center,e_brightness:8,q_auto:good";
   return `${CLOUDINARY_BASE}/${tr}/so_${t}/${id}.jpg`;
 };
 
-// Preload all frames — captures mobile flag ONCE, 12 s safety fallback
-function preloadFrames(onProgress) {
-  const mobile = window.innerWidth < 768; // captured once for this load session
+// Stream frames — calls onFrame(i, img) as each arrives so we can
+// start drawing as soon as frame 0 lands, no waiting for all 60.
+function streamFrames(onFrame) {
+  const mobile = window.innerWidth < 768;
+  const images = new Array(FRAME_COUNT).fill(null);
+  let loaded = 0;
 
-  return new Promise((resolve) => {
-    const images   = new Array(FRAME_COUNT);
-    let   loaded   = 0;
-    let   resolved = false;
+  const fallback = setTimeout(() => {
+    // Force-resolve after 8s regardless of what loaded
+    onFrame(-1, null, images, true);
+  }, 8000);
 
-    // Safety net: if network is slow or frames fail, dismiss loader after 12 s
-    const fallback = setTimeout(() => {
-      if (!resolved) { resolved = true; resolve(images); }
-    }, 12000);
-
-    const done = (i, img) => {
-      images[i] = img;
+  for (let i = 0; i < FRAME_COUNT; i++) {
+    const img = new Image();
+    const idx = i;
+    img.onload = img.onerror = () => {
+      images[idx] = img.naturalWidth ? img : null;
       loaded++;
-      onProgress(loaded / FRAME_COUNT);
-      if (loaded === FRAME_COUNT && !resolved) {
-        resolved = true;
-        clearTimeout(fallback);
-        resolve(images);
-      }
+      onFrame(idx, images[idx], images, loaded === FRAME_COUNT);
+      if (loaded === FRAME_COUNT) clearTimeout(fallback);
     };
-
-    for (let i = 0; i < FRAME_COUNT; i++) {
-      const img = new Image();
-      img.onload  = () => done(i, img);
-      img.onerror = () => done(i, null); // skip gracefully, don't block
-      img.src     = FRAME_PATH(i, mobile);
-    }
-  });
+    img.src = FRAME_PATH(i, mobile);
+  }
+  return images;
 }
 
 // object-fit: cover — image drawn at natural cover scale.
@@ -243,17 +235,36 @@ function CinematicHero({ onNav }) {
 
     const load = () => {
       framesRef.current = [];
+
+      // Lock scroll while loading
+      document.body.style.overflow = "hidden";
+
       if (loadWrapRef.current) loadWrapRef.current.style.display = "flex";
       if (loadBarRef.current)  loadBarRef.current.style.width    = "0%";
 
-      preloadFrames((pct) => {
+      let firstFrameDrawn = false;
+
+      streamFrames((idx, img, images, done) => {
         if (cancelled) return;
-        if (loadBarRef.current) loadBarRef.current.style.width = `${pct * 100}%`;
-        if (pct >= 1 && loadWrapRef.current) loadWrapRef.current.style.display = "none";
-      }).then((images) => {
-        if (cancelled) return;
+
         framesRef.current = images;
-        if (loadWrapRef.current) loadWrapRef.current.style.display = "none";
+
+        // Update progress bar
+        const loaded = images.filter(Boolean).length;
+        if (loadBarRef.current) loadBarRef.current.style.width = `${(loaded / FRAME_COUNT) * 100}%`;
+
+        // As soon as frame 0 arrives — draw it immediately and hide loader
+        if ((idx === 0 || done) && !firstFrameDrawn && images[0]) {
+          firstFrameDrawn = true;
+          if (loadWrapRef.current) loadWrapRef.current.style.display = "none";
+          // Unlock scroll the moment the first frame is visible
+          document.body.style.overflow = "";
+        }
+
+        if (done && loadWrapRef.current) {
+          loadWrapRef.current.style.display = "none";
+          document.body.style.overflow = "";
+        }
       });
     };
 
@@ -266,7 +277,7 @@ function CinematicHero({ onNav }) {
       if (nowMobile !== lastMobile) { lastMobile = nowMobile; load(); }
     };
     window.addEventListener("resize", onResize, { passive: true });
-    return () => { cancelled = true; window.removeEventListener("resize", onResize); };
+    return () => { cancelled = true; window.removeEventListener("resize", onResize); document.body.style.overflow = ""; };
   }, []);
 
   // ── rAF render loop ──────────────────────────────────────────────
