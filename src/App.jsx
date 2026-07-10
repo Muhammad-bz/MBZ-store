@@ -510,9 +510,9 @@ function GlassModal({ onClose, title, children }) {
       {/* Backdrop */}
       <div onClick={onClose} style={{
         position: "fixed", inset: 0, zIndex: 60,
-        background: "rgba(10,4,2,0.60)",
-        backdropFilter: "blur(20px)",
-        WebkitBackdropFilter: "blur(20px)",
+        background: "rgba(10,4,2,0.35)",
+        backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
         animation: "gmFadeIn 0.22s ease",
       }} />
       {/* Centered card */}
@@ -524,9 +524,9 @@ function GlassModal({ onClose, title, children }) {
       }}>
         <div style={{
           width: "100%", maxWidth: 420,
-          background: "rgba(38,16,6,0.78)",
-          backdropFilter: "blur(32px)",
-          WebkitBackdropFilter: "blur(32px)",
+          background: "rgba(38,16,6,0.85)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
           border: "1px solid rgba(200,140,60,0.18)",
           borderRadius: "1.75rem",
           boxShadow: "0 24px 64px rgba(5,2,1,0.7)",
@@ -1175,33 +1175,18 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
       <div style={{ position: "relative", zIndex: 10, marginTop: "-30vh", background: `linear-gradient(to bottom, transparent 0%, transparent 28%, ${C.bg} 38%)` }}>
         <CategorySection onNav={onNav} />
 
-        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
+        <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
           <div className="flex items-end justify-between mb-6">
-            <h2 className="text-2xl font-black" style={{ color: C.ink }}>Featured</h2>
-            <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
+            <h2 className="text-2xl font-black" style={{ color: "#C8A882" }}>Featured</h2>
+            <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: "rgba(200,168,130,0.6)" }}>View all <ArrowRight size={14} /></button>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
             {featured.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} />))}
           </div>
-        </section>
-
-        <section style={{ background: C.bgSoft, borderTop: `1px solid ${C.line}` }}>
-          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12 grid grid-cols-1 sm:grid-cols-3 gap-8">
-            {[
-              { icon: Truck,       title: "Free Shipping",   desc: "On all orders over $75"  },
-              { icon: RotateCcw,   title: "30-Day Returns",  desc: "No questions asked"       },
-              { icon: ShieldCheck, title: "Secure Checkout", desc: "Encrypted end-to-end"     },
-            ].map(({ icon: Icon, title, desc }) => (
-              <div key={title} className="flex items-center gap-4">
-                <Icon size={22} strokeWidth={1.5} style={{ color: C.inkSoft }} />
-                <div>
-                  <p className="text-sm font-medium" style={{ color: C.ink }}>{title}</p>
-                  <p className="text-xs" style={{ color: C.inkSoft, opacity: 0.75 }}>{desc}</p>
-                </div>
-              </div>
-            ))}
           </div>
         </section>
+
       </div>
     </div>
   );
@@ -1546,11 +1531,15 @@ function SuccessPage({ total, onContinue }) {
 ══════════════════════════════════════════════════════════ */
 function Footer() {
   return (
-    <footer style={{ borderTop: `1px solid ${C.line}`, marginTop: 40 }}>
+    <footer style={{ position: "relative" }}>
+      <div style={{
+        background: `linear-gradient(to bottom, #2E1508 0%, #1E0D06 100%)`,
+        boxShadow: "0 -1px 0 rgba(200,140,60,0.10)",
+      }}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 grid sm:grid-cols-4 gap-10">
         <div>
-          <p className="text-xl font-bold tracking-[0.2em] mb-3" style={{ color: C.ink }}>MBZ</p>
-          <p className="text-xs" style={{ color: C.inkSoft, opacity: 0.7 }}>Premium gear built for motion. Engineered, not assembled.</p>
+          <p className="text-xl font-bold tracking-[0.2em] mb-3" style={{ color: "#C8A882", fontFamily: FONT_ACCENT, fontStyle: "italic" }}>MBZ</p>
+          <p className="text-xs" style={{ color: "rgba(200,168,130,0.55)" }}>Premium gear built for motion. Engineered, not assembled.</p>
         </div>
         {[
           { title: "Shop",    links: ["Shoes", "Apparel", "Accessories"]        },
@@ -1558,14 +1547,15 @@ function Footer() {
           { title: "Company", links: ["About", "Careers", "Press"]              },
         ].map((col) => (
           <div key={col.title}>
-            <p className="text-sm font-medium mb-3" style={{ color: C.ink }}>{col.title}</p>
+            <p className="text-sm font-medium mb-3" style={{ color: "#C8A882" }}>{col.title}</p>
             <div className="flex flex-col gap-2">
-              {col.links.map((l) => (<span key={l} className="text-xs cursor-pointer" style={{ color: C.inkSoft, opacity: 0.7 }}>{l}</span>))}
+              {col.links.map((l) => (<span key={l} className="text-xs cursor-pointer" style={{ color: "rgba(200,168,130,0.45)" }}>{l}</span>))}
             </div>
           </div>
         ))}
       </div>
-      <div className="py-5 text-center text-xs" style={{ borderTop: `1px solid ${C.line}`, color: C.inkSoft, opacity: 0.5 }}>© 2026 MBZ. All rights reserved.</div>
+      <div className="py-5 text-center text-xs" style={{ borderTop: "1px solid rgba(200,140,60,0.10)", color: "rgba(200,168,130,0.35)" }}>© 2026 MBZ. All rights reserved.</div>
+    </div>
     </footer>
   );
 }
