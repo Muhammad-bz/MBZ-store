@@ -25,7 +25,7 @@ const FONT_ACCENT = "'Playfair Display', serif";
 function GlobalFonts() {
   return (
     <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,400;1,700;1,900&family=Plus+Jakarta+Sans:wght@500;700;800;900&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&family=Plus+Jakarta+Sans:wght@500;700;800;900&display=swap');
       @keyframes rackHang  { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
       @keyframes hintPulse { 0%, 100% { opacity: 0.5; transform: translateY(0); } 50% { opacity: 1; transform: translateY(4px); } }
     `}</style>
@@ -1185,7 +1185,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
         <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
             <div className="mb-8">
-              <h1 className="text-4xl font-black" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic" }}>Featured</h1>
+              <h1 className="text-4xl" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400 }}>Featured</h1>
               <div className="flex items-center justify-between mt-2">
                 <p className="text-sm" style={{ color: C.inkSoft }}>{featured.length} products</p>
                 <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
@@ -1222,7 +1222,7 @@ function CategoryPage({ category, onOpenProduct, wishlist, toggleWish, query, on
     <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
       <div className="mb-8">
         <BackButton onBack={onBack} />
-        <h1 className="text-4xl font-black" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic" }}>{meta.label}</h1>
+        <h1 className="text-4xl" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400 }}>{meta.label}</h1>
       </div>
       <div className="flex items-center justify-between mb-8">
         <p className="text-sm" style={{ color: C.inkSoft }}>{products.length} products</p>
@@ -1269,7 +1269,7 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
         </div>
         <div>
           <p className="text-xs tracking-[0.2em] uppercase mb-2 capitalize" style={{ color: C.inkSoft, opacity: 0.6 }}>{product.category}</p>
-          <h1 className="text-3xl sm:text-4xl font-black mb-3" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic" }}>{product.name}</h1>
+          <h1 className="text-3xl sm:text-4xl mb-3" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400 }}>{product.name}</h1>
           <div className="flex items-center gap-2 mb-4">
             <div className="flex">{Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={14} fill={i < Math.round(product.rating) ? "#d9a02e" : "none"} stroke="#d9a02e" />))}</div>
             <span className="text-xs" style={{ color: C.inkSoft }}>{product.rating} ({product.reviews} reviews)</span>
