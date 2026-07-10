@@ -1729,7 +1729,7 @@ function ContactPage({ onBack }) {
 ══════════════════════════════════════════════════════════ */
 export default function App() {
   const [view,       setView]       = useState("home");
-  const [prevView,   setPrevView]   = useState("home");
+  const [history,    setHistory]    = useState(["home"]);
   const [category,   setCategory]   = useState("shoes");
   const [productId,  setProductId]  = useState(null);
   const [cart,       setCart]       = useState([]);
@@ -1739,16 +1739,35 @@ export default function App() {
   const [searchOpen,    setSearchOpen]    = useState(false);
   const [query,      setQuery]      = useState("");
   const [orderTotal, setOrderTotal] = useState(0);
+  const [fadeKey,    setFadeKey]    = useState(0);
 
   const handleNav = (v, cat) => {
-    setPrevView(view);
+    setHistory((h) => [...h, v]);
     setView(v);
     if (cat) setCategory(cat);
     setCartOpen(false);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setFadeKey((k) => k + 1);
+    window.scrollTo({ top: 0 });
   };
 
-  const openProduct = (id) => { setProductId(id); setView("product"); window.scrollTo({ top: 0, behavior: "smooth" }); };
+  const handleBack = () => {
+    setHistory((h) => {
+      const next = h.length > 1 ? h.slice(0, -1) : ["home"];
+      const dest = next[next.length - 1];
+      setView(dest);
+      setFadeKey((k) => k + 1);
+      window.scrollTo({ top: 0 });
+      return next;
+    });
+  };
+
+  const openProduct = (id) => {
+    setProductId(id);
+    setHistory((h) => [...h, "product"]);
+    setView("product");
+    setFadeKey((k) => k + 1);
+    window.scrollTo({ top: 0 });
+  };
 
   const toggleWish = useCallback((id) => {
     setWishlist((prev) => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
@@ -1776,19 +1795,25 @@ export default function App() {
   return (
     <div className="min-h-screen font-sans" style={{ background: C.bg, color: C.ink, fontFamily: FONT_BODY }}>
       <GlobalFonts />
+      <style>{`
+        @keyframes pageFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .page-fade { animation: pageFadeIn 0.35s ease forwards; }
+      `}</style>
       <Navbar cartCount={cartCount} wishlist={wishlist} onNav={handleNav} onCart={() => setCartOpen(true)} onWishlist={() => setWishlistOpen(true)} query={query} setQuery={setQuery} />
 
-      {view === "home"     && <HomePage     onNav={handleNav} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} />}
-      {view === "category" && <CategoryPage category={category} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} query={query} onBack={() => handleNav(prevView)} />}
-      {view === "product"  && <ProductPage  productId={productId} onAddToCart={addToCart} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={openProduct} onBack={() => handleNav(prevView)} />}
-      {view === "checkout" && <CheckoutPage cart={cart} onComplete={handleCheckoutComplete} onBack={() => { setView("home"); setCartOpen(true); }} />}
-      {view === "success"  && <SuccessPage  total={orderTotal} onContinue={() => handleNav("home")} />}
-      {view === "contact"  && <ContactPage onBack={() => handleNav(prevView)} />}
+      <div key={fadeKey} className="page-fade">
+        {view === "home"     && <HomePage     onNav={handleNav} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} />}
+        {view === "category" && <CategoryPage category={category} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} query={query} onBack={handleBack} />}
+        {view === "product"  && <ProductPage  productId={productId} onAddToCart={addToCart} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={openProduct} onBack={handleBack} />}
+        {view === "checkout" && <CheckoutPage cart={cart} onComplete={handleCheckoutComplete} onBack={() => { setView("home"); setCartOpen(true); }} />}
+        {view === "success"  && <SuccessPage  total={orderTotal} onContinue={() => handleNav("home")} />}
+        {view === "contact"  && <ContactPage onBack={handleBack} />}
 
-      {view !== "success" && view !== "contact" && <Footer />}
+        {view !== "success" && view !== "contact" && <Footer />}
+      </div>
 
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} updateQty={updateQty} removeItem={removeItem}
-        onCheckout={() => { setCartOpen(false); setView("checkout"); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+        onCheckout={() => { setCartOpen(false); setView("checkout"); window.scrollTo({ top: 0 }); }} />
       <WishlistModal open={wishlistOpen} onClose={() => setWishlistOpen(false)} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={(id) => { setWishlistOpen(false); openProduct(id); }} />
     </div>
   );
