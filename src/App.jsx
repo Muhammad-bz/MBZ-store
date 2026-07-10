@@ -1250,106 +1250,113 @@ function CategoryPage({ category, onOpenProduct, wishlist, toggleWish, query, on
 ══════════════════════════════════════════════════════════ */
 function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProduct, onBack }) {
   const product = PRODUCTS.find((p) => p.id === productId);
-  const [size,  setSize]  = useState(product?.sizes[0]);
-  const [qty,   setQty]   = useState(1);
-  const [added, setAdded] = useState(false);
+  const [notified, setNotified] = useState(false);
 
-  useEffect(() => { setSize(product?.sizes[0]); setQty(1); setAdded(false); }, [productId]);
+  useEffect(() => { setNotified(false); }, [productId]);
   if (!product) return null;
 
-  const related   = PRODUCTS.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
-  const handleAdd = () => { onAddToCart({ ...product, size, qty }); setAdded(true); setTimeout(() => setAdded(false), 1800); };
+  const related = PRODUCTS.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
+
+  const REVIEWS = [
+    { name: "Jordan M.", text: "Fits true to size and the cushioning held up over a full marathon block.", stars: 5 },
+    { name: "Priya K.",  text: "Material feels premium, exactly like the photos. Shipping was fast too.",  stars: 5 },
+    { name: "Sam R.",    text: "Great quality overall, sizing ran slightly large for me.",                  stars: 4 },
+  ];
 
   return (
-    <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
-      <BackButton onBack={onBack} />
-      <div className="grid lg:grid-cols-2 gap-12">
-        <div className="aspect-square rounded-2xl overflow-hidden">
+    <div style={{ background: C.bg, minHeight: "100vh" }}>
+      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-8">
+
+        {/* Back */}
+        <BackButton onBack={onBack} />
+
+        {/* ── Image ── */}
+        <div className="aspect-square rounded-2xl overflow-hidden shadow-xl mt-4">
           <ProductVisual size="hero" />
         </div>
-        <div>
-          <p className="text-xs tracking-[0.2em] uppercase mb-2 capitalize" style={{ color: C.inkSoft, opacity: 0.6 }}>{product.category}</p>
-          <h1 className="text-3xl sm:text-4xl mb-3" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400 }}>{product.name}</h1>
-          <div className="flex items-center gap-2 mb-4">
-            <div className="flex">{Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={14} fill={i < Math.round(product.rating) ? "#d9a02e" : "none"} stroke="#d9a02e" />))}</div>
+
+        {/* ── Title + price (dark on light, matching category page colours) ── */}
+        <div className="mt-5 mb-8">
+          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.inkSoft, opacity: 0.6, marginBottom: 6 }}>{product.category}</p>
+          <div className="flex items-start justify-between gap-3">
+            <h1 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "clamp(2rem,6vw,3rem)", lineHeight: 1.05, margin: 0 }}>{product.name}</h1>
+            <p style={{ color: C.ink, fontSize: "1.4rem", fontWeight: 600, whiteSpace: "nowrap", paddingTop: 4 }}>{fmt(product.price)}</p>
+          </div>
+          {/* Rating */}
+          <div className="flex items-center gap-2 mt-3">
+            <div className="flex">{Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={13} fill={i < Math.round(product.rating) ? "#d9a02e" : "none"} stroke="#d9a02e" />))}</div>
             <span className="text-xs" style={{ color: C.inkSoft }}>{product.rating} ({product.reviews} reviews)</span>
           </div>
-          <p className="text-2xl font-semibold mb-6" style={{ color: darkBg ? "#C8A882" : C.ink }}>{fmt(product.price)}</p>
-          <p className="text-sm leading-relaxed mb-8" style={{ color: C.inkSoft }}>{product.desc}</p>
+          <p className="text-sm leading-relaxed mt-4" style={{ color: C.inkSoft }}>{product.desc}</p>
+        </div>
 
-          <div className="mb-6">
-            <p className="text-xs mb-3 uppercase tracking-wide" style={{ color: C.inkSoft }}>Size</p>
-            <div className="flex flex-wrap gap-2">
-              {product.sizes.map((s) => (
-                <button
-                  key={s} onClick={() => setSize(s)}
-                  className="px-4 py-2 rounded-full text-sm border transition-colors"
-                  style={size === s ? { background: C.maroon, color: C.bgSoft, borderColor: C.maroon } : { borderColor: C.line, color: C.inkSoft }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
+        {/* ── Coming Soon card (with reviews floating inside) ── */}
+        <div className="rounded-2xl p-6 mb-8" style={{ background: "radial-gradient(ellipse at 30% 0%, #3A2015 0%, #1E0D06 100%)", border: "1px solid rgba(200,168,130,0.14)" }}>
+          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(200,168,130,0.5)", marginBottom: 6 }}>Availability</p>
+          <p style={{ fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "1.4rem", color: "#C8A882", marginBottom: 8 }}>Coming Soon</p>
+          <p style={{ fontSize: "0.78rem", color: "rgba(200,168,130,0.55)", lineHeight: 1.6, marginBottom: 16 }}>
+            This piece is part of an upcoming drop. Be the first to know when it lands.
+          </p>
+
+          {/* Floating review cards inside the dark box */}
+          <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", marginBottom: 16 }}>
+            {REVIEWS.map((r) => (
+              <div key={r.name} style={{
+                flexShrink: 0, width: 200, borderRadius: "1rem", padding: "0.9rem 1rem",
+                background: "rgba(200,168,130,0.07)", border: "1px solid rgba(200,168,130,0.13)",
+              }}>
+                <div style={{ display: "flex", gap: 2, marginBottom: 8 }}>
+                  {Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={11} fill={i < r.stars ? "#d9a02e" : "none"} stroke="#d9a02e" />))}
+                </div>
+                <p style={{ fontSize: "0.75rem", color: "rgba(200,168,130,0.7)", lineHeight: 1.55, marginBottom: 8 }}>{r.text}</p>
+                <p style={{ fontSize: "0.7rem", color: "rgba(200,168,130,0.4)" }}>{r.name}</p>
+              </div>
+            ))}
           </div>
 
-          <div className="flex items-center gap-4 mb-8">
-            <div className="flex items-center rounded-full" style={{ border: `1px solid ${C.line}` }}>
-              <button onClick={() => setQty((q) => Math.max(1, q - 1))} className="w-9 h-9 flex items-center justify-center" style={{ color: C.inkSoft }}><Minus size={14} /></button>
-              <span className="w-8 text-center text-sm" style={{ color: C.ink }}>{qty}</span>
-              <button onClick={() => setQty((q) => q + 1)} className="w-9 h-9 flex items-center justify-center" style={{ color: C.inkSoft }}><Plus size={14} /></button>
-            </div>
-            <button
-              onClick={() => toggleWish(product.id)}
-              className="flex items-center gap-1.5 rounded-xl transition-transform hover:scale-105 active:scale-95"
-              style={{
-                background: "rgba(62,26,11,0.06)", border: `1px solid rgba(62,26,11,0.14)`,
-                padding: "0.55rem 0.85rem",
-              }}
-            >
-              <Heart size={16} fill={wishlist.has(product.id) ? C.maroon : "none"} stroke={C.inkSoft} />
-            </button>
-          </div>
-
+          {/* Notify button */}
           <button
-            onClick={handleAdd}
-            className="w-full py-4 rounded-full font-medium transition-colors flex items-center justify-center gap-2"
-            style={added ? { background: "#2f9e62", color: "#fff" } : { background: C.maroon, color: C.bgSoft }}
+            onClick={() => setNotified(true)}
+            className="w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
+            style={notified
+              ? { background: "rgba(200,168,130,0.12)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.25)" }
+              : { background: "#C8A882", color: "#1E0D06" }
+            }
           >
-            {added ? (<><Check size={16} /> Added to Cart</>) : (<><ShoppingBag size={16} /> Add to Cart</>)}
+            {notified ? (<><Check size={15} /> You're on the list</>) : "Notify Me When Available"}
           </button>
 
-          <div className="mt-8 pt-8 grid grid-cols-3 gap-4 text-xs" style={{ borderTop: `1px solid ${C.line}`, color: C.inkSoft }}>
-            <div className="flex items-center gap-2"><Truck size={14} /> Free Shipping</div>
-            <div className="flex items-center gap-2"><RotateCcw size={14} /> 30-Day Returns</div>
-            <div className="flex items-center gap-2"><ShieldCheck size={14} /> Secure Checkout</div>
-          </div>
+          {/* Wishlist */}
+          <button
+            onClick={() => toggleWish(product.id)}
+            className="mt-3 w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
+            style={{ background: "rgba(200,168,130,0.07)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.15)" }}
+          >
+            <Heart size={14} fill={wishlist.has(product.id) ? "#C8A882" : "none"} stroke="#C8A882" />
+            {wishlist.has(product.id) ? "Saved to Wishlist" : "Save to Wishlist"}
+          </button>
+        </div>
+
+        {/* Perks */}
+        <div className="grid grid-cols-3 gap-3 text-xs mb-8" style={{ color: C.inkSoft }}>
+          <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><Truck size={14} /><span>Free Shipping</span></div>
+          <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><RotateCcw size={14} /><span>30-Day Returns</span></div>
+          <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><ShieldCheck size={14} /><span>Secure Checkout</span></div>
         </div>
       </div>
 
-      <div className="mt-20 pt-12" style={{ borderTop: `1px solid ${C.line}` }}>
-        <h2 className="text-2xl font-semibold mb-6" style={{ color: C.ink }}>Reviews</h2>
-        <div className="grid sm:grid-cols-3 gap-6">
-          {[
-            { name: "Jordan M.", text: "Fits true to size and the cushioning held up over a full marathon block.", stars: 5 },
-            { name: "Priya K.",  text: "Material feels premium, exactly like the photos. Shipping was fast too.",  stars: 5 },
-            { name: "Sam R.",    text: "Great quality overall, sizing ran slightly large for me.",                  stars: 4 },
-          ].map((r) => (
-            <div key={r.name} className="rounded-xl p-5" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}>
-              <div className="flex mb-2">{Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={12} fill={i < r.stars ? "#d9a02e" : "none"} stroke="#d9a02e" />))}</div>
-              <p className="text-sm mb-3" style={{ color: C.inkSoft }}>{r.text}</p>
-              <p className="text-xs" style={{ color: C.inkSoft, opacity: 0.6 }}>{r.name}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-
+      {/* ── You may also like — with fade into footer ── */}
       {related.length > 0 && (
-        <div className="mt-20 pt-12" style={{ borderTop: `1px solid ${C.line}` }}>
-          <h2 className="text-2xl font-semibold mb-6" style={{ color: C.ink }}>You may also like</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-            {related.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} />))}
+        <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
+            <div className="mb-8">
+              <h2 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "2.25rem", margin: 0 }}>You may also like</h2>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+              {related.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />))}
+            </div>
           </div>
-        </div>
+        </section>
       )}
     </div>
   );
