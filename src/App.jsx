@@ -720,9 +720,9 @@ function SunglassesIllustration() {
    Desktop: section-level trigger, staggered fade-up
 ══════════════════════════════════════════════════════════ */
 const CATEGORY_CARDS = {
-  accessories: { label: "Accessories Collection", tag: "The Detail", publicId: "v1783608999/lv_0_20260709194928_csaect", accent: "#C8A882" },
-  apparel:     { label: "Clothing Collection",    tag: "The Detail", publicId: "v1783609030/lv_0_20260709173259_frn7xg", accent: "#C8A882" },
-  shoes:       { label: "Footwear Collection",    tag: "The Detail", publicId: "v1783609018/lv_0_20260709194610_racjqr", accent: "#C8A882" },
+  accessories: { label: "Accessories Collection", tag: "The Detail", publicId: "v1783608999/lv_0_20260709194928_csaect", accent: "#C8A882", dur: 2.5  },
+  apparel:     { label: "Clothing Collection",    tag: "The Detail", publicId: "v1783609030/lv_0_20260709173259_frn7xg", accent: "#C8A882", dur: 2.15 },
+  shoes:       { label: "Footwear Collection",    tag: "The Detail", publicId: "v1783609018/lv_0_20260709194610_racjqr", accent: "#C8A882", dur: 2.5  },
 };
 
 /* ══════════════════════════════════════════════════════════
@@ -735,27 +735,27 @@ const CATEGORY_CARDS = {
 const PANEL_FRAME_COUNT  = 45;
 const PANEL_FALLBACK_DUR = 2.5; // seconds — clip playback duration
 
-const panelFramePath = (publicId, n) => {
-  const t = ((n / (PANEL_FRAME_COUNT - 1)) * PANEL_FALLBACK_DUR).toFixed(3);
+const panelFramePath = (publicId, n, dur) => {
+  const t = ((n / (PANEL_FRAME_COUNT - 1)) * dur).toFixed(3);
   return `${CLOUDINARY_BASE}/w_1280,h_960,c_fit,q_auto:good/so_${t}/${publicId}.jpg`;
 };
 
 // Load frames one-by-one; calls onFrame(i, img) as each arrives so the
 // animation can start on frame 0 without waiting for all 45.
-function streamPanelFrames(publicId, onFrame) {
+function streamPanelFrames(publicId, dur, onFrame) {
   const images = new Array(PANEL_FRAME_COUNT).fill(null);
   for (let i = 0; i < PANEL_FRAME_COUNT; i++) {
     const img = new Image();
     const idx = i;
     img.onload  = () => { images[idx] = img; onFrame(idx, img, images); };
     img.onerror = () => {                    onFrame(idx, null, images); };
-    img.src     = panelFramePath(publicId, i);
+    img.src     = panelFramePath(publicId, i, dur);
   }
-  return images; // mutable ref — slots fill in as requests complete
+  return images;
 }
 
 function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
-  const { publicId } = card;
+  const { publicId, dur = PANEL_FALLBACK_DUR } = card;
 
   const canvasRef    = useRef(null);
   const framesRef    = useRef(new Array(PANEL_FRAME_COUNT).fill(null));
@@ -808,7 +808,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
     const dt = Math.min(0.05, (ts - lastTsRef.current) / 1000);
     lastTsRef.current = ts;
 
-    const fps   = (PANEL_FRAME_COUNT - 1) / PANEL_FALLBACK_DUR;
+    const fps   = (PANEL_FRAME_COUNT - 1) / dur;
     const delta = dt * fps;
     const MAX   = PANEL_FRAME_COUNT - 1;
 
@@ -860,7 +860,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
     framesRef.current    = new Array(PANEL_FRAME_COUNT).fill(null);
     cancelRafRef.current();
 
-    streamPanelFrames(publicId, (idx, img, images) => {
+    streamPanelFrames(publicId, dur, (idx, img, images) => {
       if (cancelled) return;
       framesRef.current[idx] = img;
 
