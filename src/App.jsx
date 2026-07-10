@@ -915,7 +915,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
         style={{
           position: "absolute", inset: 0, width: "100%", height: "100%",
           touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
-          display: "block", transform: "scale(1.04)", transformOrigin: "center center",
+          display: "block", borderRadius: "1rem",
         }}
       />
     </button>
