@@ -903,19 +903,21 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onContextMenu={(e) => e.preventDefault()}
-      className="relative rounded-2xl overflow-hidden text-left"
-      style={{ opacity: 0, aspectRatio: "4/3", touchAction: "pan-y", background: "transparent" }}
+      className="relative rounded-2xl text-left"
+      style={{ opacity: 0, aspectRatio: "4/3", touchAction: "pan-y" }}
     >
-      <canvas
-        ref={canvasRef}
-        onContextMenu={(e) => e.preventDefault()}
-        style={{
-          position: "absolute", inset: 0, width: "100%", height: "100%",
-          touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
-          display: "block",
-        }}
-      />
-
+      {/* Invisible clipping frame — rounds and crops the canvas with no background */}
+      <div style={{ position: "absolute", inset: 0, borderRadius: "1rem", overflow: "hidden" }}>
+        <canvas
+          ref={canvasRef}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{
+            position: "absolute", inset: 0, width: "100%", height: "100%",
+            touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
+            display: "block",
+          }}
+        />
+      </div>
     </button>
   );
 }
