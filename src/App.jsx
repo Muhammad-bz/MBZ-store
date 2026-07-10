@@ -810,24 +810,28 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
 
     const fps   = (PANEL_FRAME_COUNT - 1) / PANEL_FALLBACK_DUR;
     const delta = dt * fps;
+    const MAX   = PANEL_FRAME_COUNT - 1;
 
     if (directionRef.current === "forward") {
       posRef.current += delta;
-      if (posRef.current >= PANEL_FRAME_COUNT - 1) {
-        posRef.current   = PANEL_FRAME_COUNT - 1;
+      if (posRef.current >= MAX) {
+        // Carry overshoot into the reverse direction — no dwell on last frame
+        posRef.current       = MAX - (posRef.current - MAX);
         directionRef.current = "reverse";
       }
     } else {
       posRef.current -= delta;
       if (posRef.current <= 0) {
-        posRef.current = 0;
         if (modeRef.current === "leaving") {
+          posRef.current    = 0;
           modeRef.current   = "idle";
           lastTsRef.current = 0;
           cancelRafRef.current();
           return;
         }
-        directionRef.current = "forward"; // ping-pong — loop
+        // Carry overshoot into the forward direction — no dwell on frame 0
+        posRef.current       = Math.abs(posRef.current);
+        directionRef.current = "forward";
       }
     }
 
