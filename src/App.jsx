@@ -377,15 +377,22 @@ function CinematicHero({ onNav }) {
           <div className="w-full max-w-2xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
               <h1 className="text-4xl sm:text-6xl font-black leading-[0.85] mx-auto" style={{ color: "#6B3A22" }}>
-                {SCENES[0].lines.map((line, i) => {
-                  const isAccent = line === "Motion.";
-                  return (
-                    <span key={i} className="block"
-                      style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: "#C8A882" } : undefined}>
-                      {line}
-                    </span>
-                  );
-                })}
+                {/* Mobile: stacked. Desktop (sm+): single line with gap */}
+                <span className="block sm:hidden">
+                  {SCENES[0].lines.map((line, i) => {
+                    const isAccent = line === "Motion.";
+                    return (
+                      <span key={i} className="block"
+                        style={isAccent ? { fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: "#C8A882" } : undefined}>
+                        {line}
+                      </span>
+                    );
+                  })}
+                </span>
+                <span className="hidden sm:inline">
+                  <span>Built for&nbsp;</span>
+                  <span style={{ fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 500, color: "#C8A882" }}>Motion.</span>
+                </span>
               </h1>
               <p className="mt-3 max-w-md mx-auto text-xs sm:text-sm font-medium" style={{ color: "#3D2E24" }}>
                 {SCENES[0].sub}
@@ -1175,13 +1182,15 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
       <div style={{ position: "relative", zIndex: 10, marginTop: "-30vh", background: `linear-gradient(to bottom, transparent 0%, transparent 28%, ${C.bg} 38%)` }}>
         <CategorySection onNav={onNav} />
 
-        <section className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
-          <div className="flex items-end justify-between mb-6">
-            <h2 className="text-2xl font-black" style={{ color: C.ink }}>Featured</h2>
-            <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-            {featured.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />))}
+        <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
+            <div className="flex items-end justify-between mb-6">
+              <h2 className="text-2xl font-black" style={{ color: "#C8A882" }}>Featured</h2>
+              <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: "rgba(200,168,130,0.6)" }}>View all <ArrowRight size={14} /></button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
+              {featured.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />))}
+            </div>
           </div>
         </section>
 
@@ -1262,7 +1271,7 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
             <div className="flex">{Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={14} fill={i < Math.round(product.rating) ? "#d9a02e" : "none"} stroke="#d9a02e" />))}</div>
             <span className="text-xs" style={{ color: C.inkSoft }}>{product.rating} ({product.reviews} reviews)</span>
           </div>
-          <p className="text-2xl font-semibold mb-6" style={{ color: C.ink }}>{fmt(product.price)}</p>
+          <p className="text-2xl font-semibold mb-6" style={{ color: darkBg ? "#C8A882" : C.ink }}>{fmt(product.price)}</p>
           <p className="text-sm leading-relaxed mb-8" style={{ color: C.inkSoft }}>{product.desc}</p>
 
           <div className="mb-6">
@@ -1531,7 +1540,7 @@ function Footer() {
   return (
     <footer style={{ position: "relative" }}>
       <div style={{
-        background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 35%, #1E0D06 100%)`,
+        background: `linear-gradient(to bottom, #2E1508 0%, #1E0D06 100%)`,
         boxShadow: "0 -1px 0 rgba(200,140,60,0.10)",
       }}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 py-14 grid sm:grid-cols-4 gap-10">
