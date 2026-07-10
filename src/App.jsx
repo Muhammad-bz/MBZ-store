@@ -792,8 +792,6 @@ function loadPanelFrames(publicId, onProgress) {
 function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
   const { label, publicId } = card;
 
-  // Two canvases: posterCanvas holds frame 0 (always visible as the "still"),
-  // animCanvas does the ping-pong — crossfades in on hover/mobile.
   const posterCanvasRef = useRef(null);
   const animCanvasRef   = useRef(null);
   const loadBarRef      = useRef(null);
@@ -803,6 +801,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
   const durationRef  = useRef(PANEL_FALLBACK_DUR);
   const posRef       = useRef(0);
   const directionRef = useRef("forward");
+  // "idle" | "loop" | "leaving"
   const modeRef      = useRef("idle");
   const rafRef       = useRef(null);
   const lastTsRef    = useRef(0);
@@ -810,14 +809,18 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
 
   const isMobile = useRef(typeof window !== "undefined" && window.innerWidth < 768);
 
-  const cancelRaf = () => { if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } };
+  // Stable cancel helper stored in a ref so closures never go stale
+  const cancelRafRef = useRef(() => {
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+  });
 
-  // Draw a frame index to a given canvas element
+  // ── Draw one interpolated frame to a canvas ──────────────────────
   const drawToCanvas = useCallback((canvas, rawPos) => {
     const frames = framesRef.current;
     if (!canvas || frames.length === 0) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     const W = canvas.clientWidth, H = canvas.clientHeight;
+    if (W === 0 || H === 0) return;                    // canvas not laid out yet
     const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
     if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
     const ctx = canvas.getContext("2d");
@@ -828,12 +831,16 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
     const blend = rawPos - loIdx;
     if (frames[loIdx]?.naturalWidth) { ctx.globalAlpha = 1; drawImageCover(ctx, frames[loIdx], W, H); }
     if (hiIdx !== loIdx && frames[hiIdx]?.naturalWidth && blend > 0.001) {
-      ctx.globalAlpha = blend; drawImageCover(ctx, frames[hiIdx], W, H); ctx.globalAlpha = 1;
+      ctx.globalAlpha = blend; drawImageCover(ctx, frames[hiIdx], W, H);
+      ctx.globalAlpha = 1;
     }
   }, []);
 
-  // ── Main animation tick — real-time speed matched to clip duration ──
-  const tick = useCallback((ts) => {
+  // ── Animation tick ────────────────────────────────────────────────
+  // Stored in a ref so the RAF callback is always the current closure
+  // and never goes stale between re-renders.
+  const tickRef = useRef(null);
+  tickRef.current = (ts) => {
     if (!lastTsRef.current) lastTsRef.current = ts;
     const dt = Math.min(0.05, (ts - lastTsRef.current) / 1000);
     lastTsRef.current = ts;
@@ -845,62 +852,70 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
     if (directionRef.current === "forward") {
       posRef.current += delta;
       if (posRef.current >= frameCount - 1) {
-        posRef.current = frameCount - 1;
-        directionRef.current = "reverse";
+        posRef.current   = frameCount - 1;
+        directionRef.current = "reverse";            // hit the end — reverse instantly
       }
     } else {
       posRef.current -= delta;
       if (posRef.current <= 0) {
         posRef.current = 0;
         if (modeRef.current === "leaving") {
-          // Walked back to frame 0 — crossfade back to poster, stop
+          // Walked back to frame 0 on hover-out — fade anim canvas out, stop
           if (animCanvasRef.current) animCanvasRef.current.style.opacity = "0";
-          modeRef.current = "idle";
-          lastTsRef.current = 0;
-          cancelRaf();
+          modeRef.current      = "idle";
+          lastTsRef.current    = 0;
+          cancelRafRef.current();
           return;
         }
-        directionRef.current = "forward"; // seamless ping-pong loop
+        // Ping-pong loop — go forward again without any pause
+        directionRef.current = "forward";
       }
     }
 
     drawToCanvas(animCanvasRef.current, posRef.current);
-    rafRef.current = requestAnimationFrame(tick);
-  }, [drawToCanvas]);
+    // Schedule next tick via the ref so we always call the latest closure
+    rafRef.current = requestAnimationFrame((t) => tickRef.current(t));
+  };
 
+  // ── Start the ping-pong loop ──────────────────────────────────────
   const startLoop = useCallback(() => {
     if (!readyRef.current) return;
     if (animCanvasRef.current) animCanvasRef.current.style.opacity = "1";
     modeRef.current = "loop";
-    if (!rafRef.current) { lastTsRef.current = 0; rafRef.current = requestAnimationFrame(tick); }
-  }, [tick]);
+    if (!rafRef.current) {
+      lastTsRef.current = 0;
+      rafRef.current = requestAnimationFrame((t) => tickRef.current(t));
+    }
+  }, []);
 
-  // ── Load frames once on mount ──
+  // ── Load frames once on mount ─────────────────────────────────────
   useEffect(() => {
     let cancelled = false;
 
     loadPanelFrames(publicId, (pct) => {
       if (cancelled) return;
       if (loadBarRef.current) loadBarRef.current.style.width = `${pct * 100}%`;
-      if (pct >= 1 && loadWrapRef.current) loadWrapRef.current.style.display = "none";
     }).then(({ images, duration }) => {
       if (cancelled) return;
       framesRef.current   = images;
       durationRef.current = duration;
       readyRef.current    = true;
       if (loadWrapRef.current) loadWrapRef.current.style.display = "none";
-      // Paint frame 0 onto the poster canvas — no static PNG needed
-      drawToCanvas(posterCanvasRef.current, 0);
-      if (isMobile.current) startLoop();
+      // Slight delay so the canvas has definitely been laid out and has clientWidth
+      requestAnimationFrame(() => {
+        drawToCanvas(posterCanvasRef.current, 0);   // paint frame 0 as the still
+        if (isMobile.current) startLoop();
+      });
     });
 
-    return () => { cancelled = true; };
+    return () => { cancelled = true; cancelRafRef.current(); };
   }, [publicId, startLoop, drawToCanvas]);
 
-  // ── Desktop hover handlers ───────────────────────────────────────
+  // ── Desktop hover ─────────────────────────────────────────────────
   const handleMouseEnter = useCallback(() => {
     if (isMobile.current) return;
     if (modeRef.current === "leaving") {
+      // Mid-reverse — just flip back to looping from wherever we are
       modeRef.current = "loop";
       if (animCanvasRef.current) animCanvasRef.current.style.opacity = "1";
       return;
@@ -912,10 +927,8 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
     if (isMobile.current) return;
     if (modeRef.current === "idle") return;
     directionRef.current = "reverse";
-    modeRef.current = "leaving";
+    modeRef.current      = "leaving";
   }, []);
-
-  useEffect(() => () => cancelRaf(), []);
 
   return (
     <button
@@ -923,30 +936,37 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       onClick={() => onNav("category", cardKey)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      // Prevent the browser context menu that appears on long-press over canvas
+      onContextMenu={(e) => e.preventDefault()}
       className="relative rounded-2xl overflow-hidden text-left"
-      style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3" }}
+      style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3", touchAction: "pan-y" }}
     >
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
-        {/* Frame 0 poster — painted via canvas once frames load, no static PNG */}
+        {/* Frame-0 still — painted once frames load; shown while idle on desktop */}
         <canvas
           ref={posterCanvasRef}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%" }}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{ position: "absolute", inset: 0, width: "100%", height: "100%",
+                   touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none" }}
         />
-        {/* Animated ping-pong canvas — crossfades in over poster */}
+        {/* Ping-pong animation canvas — crossfades in over the still */}
         <canvas
           ref={animCanvasRef}
+          onContextMenu={(e) => e.preventDefault()}
           style={{
             position: "absolute", inset: 0, width: "100%", height: "100%",
             opacity: 0, transition: "opacity 0.3s ease",
+            touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
           }}
         />
-        {/* Loading indicator — same style as the cinematic hero */}
+        {/* Loading bar */}
         <div
           ref={loadWrapRef}
           style={{
             position: "absolute", inset: 0, display: "flex",
             flexDirection: "column", alignItems: "center", justifyContent: "center",
             gap: 8, background: "rgba(0,0,0,0.55)", borderRadius: "inherit",
+            pointerEvents: "none",
           }}
         >
           <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase" }}>Loading</p>
