@@ -917,6 +917,11 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
             display: "block",
           }}
         />
+        {/* Rounded corner mask — sits on top of the canvas, hides the video's own light edges */}
+        <div style={{
+          position: "absolute", inset: 0, borderRadius: "1rem", pointerEvents: "none",
+          boxShadow: `inset 0 0 0 2px #ECEAE5`,
+        }} />
       </div>
     </button>
   );
