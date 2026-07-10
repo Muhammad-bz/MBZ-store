@@ -907,20 +907,21 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
         background: "#2E1A0E", border: "none", padding: 0,
         position: "relative", display: "block",
         borderRadius: "1.25rem", overflow: "hidden",
+        isolation: "isolate",
+        WebkitMaskImage: "-webkit-radial-gradient(white, black)",
+        transform: "translateZ(0)",
       }}
     >
-      {/* Canvas — fills the button perfectly, clipped by overflow:hidden on parent */}
+      {/* Canvas — 1px outset so sub-pixel anti-aliasing never shows background */}
       <canvas
         ref={canvasRef}
         onContextMenu={(e) => e.preventDefault()}
         style={{
-          position: "absolute", inset: 0, width: "100%", height: "100%",
+          position: "absolute", inset: "-1px", width: "calc(100% + 2px)", height: "calc(100% + 2px)",
           touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
           display: "block",
         }}
       />
-
-
     </button>
   );
 }
