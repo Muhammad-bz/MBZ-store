@@ -737,7 +737,7 @@ const PANEL_FALLBACK_DUR = 2.5; // seconds — clip playback duration
 
 const panelFramePath = (publicId, n) => {
   const t = ((n / (PANEL_FRAME_COUNT - 1)) * PANEL_FALLBACK_DUR).toFixed(3);
-  return `${CLOUDINARY_BASE}/w_960,h_720,c_fill,g_center,q_auto:good/so_${t}/${publicId}.jpg`;
+  return `${CLOUDINARY_BASE}/w_1280,h_960,c_fit,q_auto:good/so_${t}/${publicId}.jpg`;
 };
 
 // Load frames one-by-one; calls onFrame(i, img) as each arrives so the
@@ -906,7 +906,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
         width: "100%", aspectRatio: "4/3", touchAction: "pan-y",
         background: "#2E1A0E", border: "none", padding: 0,
         position: "relative", display: "block",
-        borderRadius: "1.25rem", overflow: "hidden",
+        borderRadius: "3rem", overflow: "hidden",
         isolation: "isolate",
         WebkitMaskImage: "-webkit-radial-gradient(white, black)",
         transform: "translateZ(0)",
