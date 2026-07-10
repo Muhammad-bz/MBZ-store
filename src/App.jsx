@@ -726,208 +726,174 @@ const CATEGORY_CARDS = {
 };
 
 /* ══════════════════════════════════════════════════════════
-   PANEL FRAME SEQUENCE (Cloudinary) — same technique as the
-   cinematic hero: instead of a <video> tag (which stutters
-   when we scrub currentTime for reverse playback), we pull a
-   sequence of jpg frames from Cloudinary and paint them onto a
-   <canvas>. Reverse is then just "walk the same array
-   backwards" — perfectly smooth, no decoder seeking, no gap.
+   PANEL FRAME SEQUENCE (Cloudinary jpg frames → canvas)
+   ── Single canvas, no <video>, no mp4.
+   ── Starts playing as soon as frame 0 arrives (streaming start).
+   ── Ping-pong: forward → reverse → forward, no pause at either end.
+   ── Mobile: runs always. Desktop: hover to play, reverses on leave.
 ══════════════════════════════════════════════════════════ */
-const PANEL_FRAME_COUNT  = 45;   // frames captured per panel clip
-const PANEL_FALLBACK_DUR = 2.5;  // seconds — used only if the metadata probe fails
+const PANEL_FRAME_COUNT  = 45;
+const PANEL_FALLBACK_DUR = 2.5; // seconds — clip playback duration
 
-const panelFramePath = (publicId, n, frameCount, duration) => {
-  const t = ((n / (frameCount - 1)) * duration).toFixed(3);
+const panelFramePath = (publicId, n) => {
+  const t = ((n / (PANEL_FRAME_COUNT - 1)) * PANEL_FALLBACK_DUR).toFixed(3);
   return `${CLOUDINARY_BASE}/w_960,h_720,c_fill,g_center,q_auto:good/so_${t}/${publicId}.jpg`;
 };
 
-// Preload every frame image from Cloudinary — no <video> element, no mp4.
-// Duration is fixed (PANEL_FALLBACK_DUR); always resolves.
-function loadPanelFrames(publicId, onProgress) {
-  return new Promise((resolve) => {
-    const duration = PANEL_FALLBACK_DUR;
-    const images   = new Array(PANEL_FRAME_COUNT);
-    let   loaded   = 0;
-    let   resolved = false;
-
-    // Safety net — never block the panel forever on a slow connection
-    const fallback = setTimeout(() => {
-      if (!resolved) { resolved = true; resolve({ images, duration }); }
-    }, 10000);
-
-    const done = (i, img) => {
-      images[i] = img;
-      loaded++;
-      onProgress(loaded / PANEL_FRAME_COUNT);
-      if (loaded === PANEL_FRAME_COUNT && !resolved) {
-        resolved = true;
-        clearTimeout(fallback);
-        resolve({ images, duration });
-      }
-    };
-
-    for (let i = 0; i < PANEL_FRAME_COUNT; i++) {
-      const img = new Image();
-      img.onload  = () => done(i, img);
-      img.onerror = () => done(i, null);
-      img.src     = panelFramePath(publicId, i, PANEL_FRAME_COUNT, duration);
-    }
-  });
+// Load frames one-by-one; calls onFrame(i, img) as each arrives so the
+// animation can start on frame 0 without waiting for all 45.
+function streamPanelFrames(publicId, onFrame) {
+  const images = new Array(PANEL_FRAME_COUNT).fill(null);
+  for (let i = 0; i < PANEL_FRAME_COUNT; i++) {
+    const img = new Image();
+    const idx = i;
+    img.onload  = () => { images[idx] = img; onFrame(idx, img, images); };
+    img.onerror = () => {                    onFrame(idx, null, images); };
+    img.src     = panelFramePath(publicId, i);
+  }
+  return images; // mutable ref — slots fill in as requests complete
 }
 
-/* ── Per-panel frame-sequence hover card ──────────────────────────
-   mode:      "idle" | "loop" | "leaving"
-   direction: "forward" | "reverse"
-   pos:       fractional frame index (0 … frameCount-1)
-
-   Mobile:  mode locks to "loop" forever from mount (video "runs all
-            the time"), ping-ponging forward → reverse → forward …
-   Desktop: hover-in starts "loop" ping-pong; hover-out flips
-            direction to reverse and switches mode to "leaving" so
-            it walks smoothly back to frame 0 from wherever it
-            currently is (no jump, no restart) and then hides.
-   Re-entering mid-reverse just flips mode back to "loop" — the
-   canvas is already mid-frame, so there's no visible gap.
-══════════════════════════════════════════════════════════════════ */
 function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
-  const { label, publicId } = card;
+  const { publicId } = card;
 
-  const posterCanvasRef = useRef(null);
-  const animCanvasRef   = useRef(null);
-  const loadBarRef      = useRef(null);
-  const loadWrapRef     = useRef(null);
-
-  const framesRef    = useRef([]);
-  const durationRef  = useRef(PANEL_FALLBACK_DUR);
+  const canvasRef    = useRef(null);
+  const framesRef    = useRef(new Array(PANEL_FRAME_COUNT).fill(null));
   const posRef       = useRef(0);
   const directionRef = useRef("forward");
   // "idle" | "loop" | "leaving"
   const modeRef      = useRef("idle");
   const rafRef       = useRef(null);
   const lastTsRef    = useRef(0);
-  const readyRef     = useRef(false);
+  const readyRef     = useRef(false); // true once frame 0 has arrived
 
   const isMobile = useRef(typeof window !== "undefined" && window.innerWidth < 768);
 
-  // Stable cancel helper stored in a ref so closures never go stale
-  const cancelRafRef = useRef(() => {
+  const cancelRafRef = useRef(null);
+  cancelRafRef.current = () => {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
-  });
+  };
 
-  // ── Draw one interpolated frame to a canvas ──────────────────────
-  const drawToCanvas = useCallback((canvas, rawPos) => {
+  // ── Draw current pos to the single canvas ──────────────────────
+  const drawRef = useRef(null);
+  drawRef.current = () => {
+    const canvas = canvasRef.current;
     const frames = framesRef.current;
-    if (!canvas || frames.length === 0) return;
+    if (!canvas) return;
     const dpr = Math.min(window.devicePixelRatio || 1, 2.5);
     const W = canvas.clientWidth, H = canvas.clientHeight;
-    if (W === 0 || H === 0) return;                    // canvas not laid out yet
+    if (W === 0 || H === 0) return;
     const pw = Math.round(W * dpr), ph = Math.round(H * dpr);
     if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
     const ctx = canvas.getContext("2d");
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    const loIdx = Math.max(0, Math.min(frames.length - 1, Math.floor(rawPos)));
-    const hiIdx = Math.min(frames.length - 1, loIdx + 1);
-    const blend = rawPos - loIdx;
-    if (frames[loIdx]?.naturalWidth) { ctx.globalAlpha = 1; drawImageCover(ctx, frames[loIdx], W, H); }
-    if (hiIdx !== loIdx && frames[hiIdx]?.naturalWidth && blend > 0.001) {
-      ctx.globalAlpha = blend; drawImageCover(ctx, frames[hiIdx], W, H);
+    const rawPos = posRef.current;
+    const loIdx  = Math.max(0, Math.min(frames.length - 1, Math.floor(rawPos)));
+    const hiIdx  = Math.min(frames.length - 1, loIdx + 1);
+    const blend  = rawPos - loIdx;
+    if (!frames[loIdx]) return; // frame not loaded yet — skip draw
+    ctx.globalAlpha = 1;
+    drawImageCover(ctx, frames[loIdx], W, H);
+    if (hiIdx !== loIdx && frames[hiIdx] && blend > 0.001) {
+      ctx.globalAlpha = blend;
+      drawImageCover(ctx, frames[hiIdx], W, H);
       ctx.globalAlpha = 1;
     }
-  }, []);
+  };
 
-  // ── Animation tick ────────────────────────────────────────────────
-  // Stored in a ref so the RAF callback is always the current closure
-  // and never goes stale between re-renders.
+  // ── Tick — runs every RAF ───────────────────────────────────────
   const tickRef = useRef(null);
   tickRef.current = (ts) => {
     if (!lastTsRef.current) lastTsRef.current = ts;
     const dt = Math.min(0.05, (ts - lastTsRef.current) / 1000);
     lastTsRef.current = ts;
 
-    const frameCount   = PANEL_FRAME_COUNT;
-    const framesPerSec = (frameCount - 1) / durationRef.current;
-    const delta        = dt * framesPerSec;
+    const fps   = (PANEL_FRAME_COUNT - 1) / PANEL_FALLBACK_DUR;
+    const delta = dt * fps;
 
     if (directionRef.current === "forward") {
       posRef.current += delta;
-      if (posRef.current >= frameCount - 1) {
-        posRef.current   = frameCount - 1;
-        directionRef.current = "reverse";            // hit the end — reverse instantly
+      if (posRef.current >= PANEL_FRAME_COUNT - 1) {
+        posRef.current   = PANEL_FRAME_COUNT - 1;
+        directionRef.current = "reverse";
       }
     } else {
       posRef.current -= delta;
       if (posRef.current <= 0) {
         posRef.current = 0;
         if (modeRef.current === "leaving") {
-          // Walked back to frame 0 on hover-out — fade anim canvas out, stop
-          if (animCanvasRef.current) animCanvasRef.current.style.opacity = "0";
-          modeRef.current      = "idle";
-          lastTsRef.current    = 0;
+          modeRef.current   = "idle";
+          lastTsRef.current = 0;
           cancelRafRef.current();
           return;
         }
-        // Ping-pong loop — go forward again without any pause
-        directionRef.current = "forward";
+        directionRef.current = "forward"; // ping-pong — loop
       }
     }
 
-    drawToCanvas(animCanvasRef.current, posRef.current);
-    // Schedule next tick via the ref so we always call the latest closure
+    drawRef.current();
     rafRef.current = requestAnimationFrame((t) => tickRef.current(t));
   };
 
-  // ── Start the ping-pong loop ──────────────────────────────────────
-  const startLoop = useCallback(() => {
+  // ── Start / resume loop ─────────────────────────────────────────
+  const startLoopRef = useRef(null);
+  startLoopRef.current = () => {
     if (!readyRef.current) return;
-    if (animCanvasRef.current) animCanvasRef.current.style.opacity = "1";
     modeRef.current = "loop";
     if (!rafRef.current) {
       lastTsRef.current = 0;
       rafRef.current = requestAnimationFrame((t) => tickRef.current(t));
     }
-  }, []);
+  };
 
-  // ── Load frames once on mount ─────────────────────────────────────
+  // ── Stream frames; start animating on frame 0 ──────────────────
   useEffect(() => {
     let cancelled = false;
+    posRef.current       = 0;
+    directionRef.current = "forward";
+    modeRef.current      = "idle";
+    readyRef.current     = false;
+    framesRef.current    = new Array(PANEL_FRAME_COUNT).fill(null);
+    cancelRafRef.current();
 
-    loadPanelFrames(publicId, (pct) => {
+    streamPanelFrames(publicId, (idx, img, images) => {
       if (cancelled) return;
-      if (loadBarRef.current) loadBarRef.current.style.width = `${pct * 100}%`;
-    }).then(({ images, duration }) => {
-      if (cancelled) return;
-      framesRef.current   = images;
-      durationRef.current = duration;
-      readyRef.current    = true;
-      if (loadWrapRef.current) loadWrapRef.current.style.display = "none";
-      // Slight delay so the canvas has definitely been laid out and has clientWidth
-      requestAnimationFrame(() => {
-        drawToCanvas(posterCanvasRef.current, 0);   // paint frame 0 as the still
-        if (isMobile.current) startLoop();
-      });
+      framesRef.current[idx] = img;
+
+      // As soon as frame 0 arrives — draw it and start loop on mobile
+      if (idx === 0 && img) {
+        readyRef.current = true;
+        requestAnimationFrame(() => {
+          if (cancelled) return;
+          drawRef.current();
+          if (isMobile.current) startLoopRef.current();
+        });
+      }
     });
 
     return () => { cancelled = true; cancelRafRef.current(); };
-  }, [publicId, startLoop, drawToCanvas]);
+  }, [publicId]);
 
-  // ── Desktop hover ─────────────────────────────────────────────────
+  // ── Desktop hover ───────────────────────────────────────────────
   const handleMouseEnter = useCallback(() => {
     if (isMobile.current) return;
     if (modeRef.current === "leaving") {
-      // Mid-reverse — just flip back to looping from wherever we are
-      modeRef.current = "loop";
-      if (animCanvasRef.current) animCanvasRef.current.style.opacity = "1";
+      modeRef.current = "loop"; // mid-reverse — keep going, just flip goal
       return;
     }
-    startLoop();
-  }, [startLoop]);
+    startLoopRef.current();
+  }, []);
 
   const handleMouseLeave = useCallback(() => {
     if (isMobile.current) return;
     if (modeRef.current === "idle") return;
     directionRef.current = "reverse";
     modeRef.current      = "leaving";
+    // Ensure RAF is running so it walks back to frame 0
+    if (!rafRef.current) {
+      lastTsRef.current = 0;
+      rafRef.current = requestAnimationFrame((t) => tickRef.current(t));
+    }
   }, []);
 
   return (
@@ -936,45 +902,20 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       onClick={() => onNav("category", cardKey)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      // Prevent the browser context menu that appears on long-press over canvas
       onContextMenu={(e) => e.preventDefault()}
       className="relative rounded-2xl overflow-hidden text-left"
-      style={{ opacity: 0, background: "#5C3D2A", aspectRatio: "4/3", touchAction: "pan-y" }}
+      style={{ opacity: 0, aspectRatio: "4/3", touchAction: "pan-y", background: "transparent" }}
     >
-      <div className="absolute inset-0 rounded-2xl overflow-hidden">
-        {/* Frame-0 still — painted once frames load; shown while idle on desktop */}
-        <canvas
-          ref={posterCanvasRef}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{ position: "absolute", inset: 0, width: "100%", height: "100%",
-                   touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none" }}
-        />
-        {/* Ping-pong animation canvas — crossfades in over the still */}
-        <canvas
-          ref={animCanvasRef}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{
-            position: "absolute", inset: 0, width: "100%", height: "100%",
-            opacity: 0, transition: "opacity 0.3s ease",
-            touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
-          }}
-        />
-        {/* Loading bar */}
-        <div
-          ref={loadWrapRef}
-          style={{
-            position: "absolute", inset: 0, display: "flex",
-            flexDirection: "column", alignItems: "center", justifyContent: "center",
-            gap: 8, background: "rgba(0,0,0,0.55)", borderRadius: "inherit",
-            pointerEvents: "none",
-          }}
-        >
-          <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 10, letterSpacing: "0.2em", textTransform: "uppercase" }}>Loading</p>
-          <div style={{ width: 80, height: 2, background: "rgba(255,255,255,0.12)", borderRadius: 2 }}>
-            <div ref={loadBarRef} style={{ height: "100%", width: "0%", background: "#C8A882", borderRadius: 2, transition: "width 0.08s linear" }} />
-          </div>
-        </div>
-      </div>
+      <canvas
+        ref={canvasRef}
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
+          display: "block",
+        }}
+      />
+
     </button>
   );
 }
