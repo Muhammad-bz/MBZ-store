@@ -372,11 +372,11 @@ function CinematicHero({ onNav }) {
           </div>
         </div>
 
-        {/* Text — shifted down slightly so it sits over the cloth pile */}
-        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-5%)" }}>
-          <div className="w-full max-w-2xl mx-auto text-center px-6">
+        {/* Text — shifted up slightly on desktop */}
+        <div className="relative h-full flex items-center justify-center" style={{ zIndex: 10, transform: "translateY(-12%)" }}>
+          <div className="w-full max-w-xl mx-auto text-center px-6">
             <div ref={textWrapRef} style={{ opacity: 0, willChange: "opacity, transform" }}>
-              <h1 className="text-4xl sm:text-6xl font-black leading-[0.85] mx-auto" style={{ color: "#6B3A22" }}>
+              <h1 className="text-4xl sm:text-5xl font-black leading-[0.85] mx-auto" style={{ color: "#6B3A22" }}>
                 {/* Mobile: stacked. Desktop (sm+): single line with gap */}
                 <span className="block sm:hidden">
                   {SCENES[0].lines.map((line, i) => {
@@ -448,8 +448,10 @@ function BackButton({ onBack }) {
 function TiltCard({ product, onOpen, isWishlisted, onToggleWish, darkBg = false }) {
   const ref = useRef(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0, glowX: 50, glowY: 50 });
+  const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 
   const handleMove = (e) => {
+    if (isMobile) return;
     const rect = ref.current.getBoundingClientRect();
     const px   = (e.clientX - rect.left) / rect.width;
     const py   = (e.clientY - rect.top)  / rect.height;
@@ -464,34 +466,36 @@ function TiltCard({ product, onOpen, isWishlisted, onToggleWish, darkBg = false 
       onMouseLeave={reset}
       onClick={() => onOpen(product.id)}
       className="group relative cursor-pointer"
-      style={{ perspective: "1000px" }}
+      style={{ perspective: isMobile ? "none" : "1000px" }}
     >
       <div
         className="relative aspect-[4/5] rounded-2xl overflow-hidden transition-transform duration-200 ease-out shadow-lg"
-        style={{ transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`, boxShadow: "0 12px 30px rgba(62,26,11,0.18)" }}
+        style={{ transform: isMobile ? "none" : `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`, boxShadow: "0 8px 24px rgba(62,26,11,0.15)" }}
       >
         <ProductVisual size="large" />
-        <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-          style={{ background: `radial-gradient(circle at ${tilt.glowX}% ${tilt.glowY}%, rgba(200,168,130,0.12), transparent 60%)` }}
-        />
+        {!isMobile && (
+          <div
+            className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
+            style={{ background: `radial-gradient(circle at ${tilt.glowX}% ${tilt.glowY}%, rgba(200,168,130,0.12), transparent 60%)` }}
+          />
+        )}
         <button
           onClick={(e) => { e.stopPropagation(); onToggleWish(product.id); }}
-          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-xl transition-transform hover:scale-105 active:scale-95"
+          className="absolute top-2 right-2 z-10 flex items-center gap-1 rounded-xl active:scale-95"
           style={{
             background: "rgba(200,168,130,0.10)", border: "1px solid rgba(200,168,130,0.22)",
-            padding: "0.35rem 0.6rem",
+            padding: "0.3rem 0.5rem",
           }}
         >
-          <Heart size={14} fill={isWishlisted ? "#C8A882" : "none"} stroke="#C8A882" />
+          <Heart size={13} fill={isWishlisted ? "#C8A882" : "none"} stroke="#C8A882" />
         </button>
       </div>
-      <div className="mt-3 flex items-start justify-between">
+      <div className="mt-2 flex items-start justify-between gap-1">
         <div>
-          <p className="text-sm font-medium" style={{ color: darkBg ? "#C8A882" : C.ink }}>{product.name}</p>
-          <p className="text-xs capitalize" style={{ color: darkBg ? "rgba(200,168,130,0.55)" : C.inkSoft, opacity: darkBg ? 1 : 0.7 }}>{product.category}</p>
+          <p className="text-xs sm:text-sm font-medium leading-tight" style={{ color: darkBg ? "#C8A882" : C.ink }}>{product.name}</p>
+          <p className="text-[11px] capitalize mt-0.5" style={{ color: darkBg ? "rgba(200,168,130,0.55)" : C.inkSoft, opacity: darkBg ? 1 : 0.7 }}>{product.category}</p>
         </div>
-        <p className="text-sm font-semibold" style={{ color: darkBg ? "#C8A882" : C.ink }}>{fmt(product.price)}</p>
+        <p className="text-xs sm:text-sm font-semibold shrink-0" style={{ color: darkBg ? "#C8A882" : C.ink }}>{fmt(product.price)}</p>
       </div>
     </div>
   );
@@ -1157,7 +1161,7 @@ function CategorySection({ onNav }) {
 
   return (
     <div style={{ overflow: "hidden" }}>
-      <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
+      <section ref={sectionRef} className="max-w-7xl mx-auto px-4 sm:px-8 py-10 sm:py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => (
             <div key={key} ref={(el) => { cardRefs.current[i] = el; }} style={{ willChange: "transform, opacity" }}>
@@ -1219,24 +1223,24 @@ function CategoryPage({ category, onOpenProduct, wishlist, toggleWish, query, on
   }, [category, sort, query]);
 
   return (
-    <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
-      <div className="mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-8 py-8 sm:py-12">
+      <div className="mb-5 sm:mb-8">
         <BackButton onBack={onBack} />
-        <h1 className="text-4xl" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400 }}>{meta.label}</h1>
+        <h1 className="text-3xl sm:text-4xl mt-2" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400 }}>{meta.label}</h1>
       </div>
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-5 sm:mb-8">
         <p className="text-sm" style={{ color: C.inkSoft }}>{products.length} products</p>
-        <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-full px-4 py-2 text-sm outline-none" style={{ background: C.bgSoft, border: `1px solid ${C.line}`, color: C.ink }}>
+        <select value={sort} onChange={(e) => setSort(e.target.value)} className="rounded-full px-3 py-1.5 text-xs sm:text-sm outline-none" style={{ background: C.bgSoft, border: `1px solid ${C.line}`, color: C.ink }}>
           <option value="featured">Featured</option>
-          <option value="price-asc">Price: Low to High</option>
-          <option value="price-desc">Price: High to Low</option>
+          <option value="price-asc">Price ↑</option>
+          <option value="price-desc">Price ↓</option>
           <option value="rating">Top Rated</option>
         </select>
       </div>
       {products.length === 0
         ? <p className="text-sm" style={{ color: C.inkSoft }}>No products match your search.</p>
         : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
             {products.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} />))}
           </div>
         )
@@ -1265,29 +1269,29 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh" }}>
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 pt-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 sm:pt-8">
 
         {/* Back */}
         <BackButton onBack={onBack} />
 
         {/* ── Image ── */}
-        <div className="aspect-square rounded-2xl overflow-hidden shadow-xl mt-4">
+        <div className="aspect-square rounded-2xl overflow-hidden shadow-xl mt-3 sm:mt-4">
           <ProductVisual size="hero" />
         </div>
 
-        {/* ── Title + price (dark on light, matching category page colours) ── */}
-        <div className="mt-5 mb-8">
-          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.inkSoft, opacity: 0.6, marginBottom: 6 }}>{product.category}</p>
+        {/* ── Title + price ── */}
+        <div className="mt-4 mb-6 sm:mt-5 sm:mb-8">
+          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.inkSoft, opacity: 0.6, marginBottom: 4 }}>{product.category}</p>
           <div className="flex items-start justify-between gap-3">
-            <h1 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "clamp(2rem,6vw,3rem)", lineHeight: 1.05, margin: 0 }}>{product.name}</h1>
-            <p style={{ color: C.ink, fontSize: "1.4rem", fontWeight: 600, whiteSpace: "nowrap", paddingTop: 4 }}>{fmt(product.price)}</p>
+            <h1 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "clamp(1.6rem,5vw,3rem)", lineHeight: 1.05, margin: 0 }}>{product.name}</h1>
+            <p style={{ color: C.ink, fontSize: "1.2rem", fontWeight: 600, whiteSpace: "nowrap", paddingTop: 4 }}>{fmt(product.price)}</p>
           </div>
           {/* Rating */}
-          <div className="flex items-center gap-2 mt-3">
+          <div className="flex items-center gap-2 mt-2">
             <div className="flex">{Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={13} fill={i < Math.round(product.rating) ? "#d9a02e" : "none"} stroke="#d9a02e" />))}</div>
-            <span className="text-xs" style={{ color: C.inkSoft }}>{product.rating} ({product.reviews} reviews)</span>
+            <span className="text-xs" style={{ color: C.inkSoft }}>{product.rating} ({product.reviews})</span>
           </div>
-          <p className="text-sm leading-relaxed mt-4" style={{ color: C.inkSoft }}>{product.desc}</p>
+          <p className="text-sm leading-relaxed mt-3" style={{ color: C.inkSoft }}>{product.desc}</p>
         </div>
 
         {/* ── Coming Soon card (with reviews floating inside) ── */}
