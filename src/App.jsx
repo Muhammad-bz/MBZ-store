@@ -898,13 +898,12 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
 
   return (
     <button
-      ref={(el) => { cardRefs.current[index] = el; }}
       onClick={() => onNav("category", cardKey)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onContextMenu={(e) => e.preventDefault()}
       style={{
-        opacity: 0, aspectRatio: "4/3", touchAction: "pan-y",
+        width: "100%", aspectRatio: "4/3", touchAction: "pan-y",
         background: "none", border: "none", padding: 0,
         position: "relative", display: "block",
       }}
@@ -980,7 +979,6 @@ function CategorySection({ onNav }) {
     cardRefs.current.forEach((el) => {
       if (el) {
         el.style.opacity = "0";
-        el.style.willChange = "transform, opacity";
       }
     });
     window.addEventListener("scroll", onScroll, { passive: true });
@@ -990,7 +988,7 @@ function CategorySection({ onNav }) {
       window.removeEventListener("scroll", onScroll);
       window.removeEventListener("resize", onScroll);
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      cardRefs.current.forEach((el) => { if (el) el.style.willChange = "auto"; });
+      cardRefs.current.forEach((el) => { if (el) el.style.willChange = ""; });
     };
   }, []);
 
@@ -999,7 +997,9 @@ function CategorySection({ onNav }) {
       <section ref={sectionRef} className="max-w-7xl mx-auto px-5 sm:px-8 py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => (
-            <CategoryCard key={key} cardKey={key} card={card} index={i} cardRefs={cardRefs} onNav={onNav} />
+            <div key={key} ref={(el) => { cardRefs.current[i] = el; }} style={{ willChange: "transform, opacity" }}>
+              <CategoryCard cardKey={key} card={card} index={i} cardRefs={{ current: [] }} onNav={onNav} />
+            </div>
           ))}
         </div>
       </section>
