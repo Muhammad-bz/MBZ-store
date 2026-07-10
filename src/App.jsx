@@ -59,26 +59,49 @@ const PRODUCTS = [
 const fmt = (n) => `$${n.toFixed(2)}`;
 
 /* ══════════════════════════════════════════════════════════
-   PRODUCT VISUAL
+   COMING SOON CARD  (replaces ProductVisual)
 ══════════════════════════════════════════════════════════ */
-function ProductVisual({ hue, category, size = "normal" }) {
-  const Icon = CATEGORY_META[category]?.icon ?? ShoppingBag;
+function ProductVisual({ size = "normal" }) {
+  const [hovered, setHovered] = useState(false);
   return (
     <div
       className="relative w-full h-full flex items-center justify-center overflow-hidden rounded-2xl"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
       style={{
-        background: `radial-gradient(circle at 30% 20%, hsl(${hue} 90% 80%) 0%, hsl(${hue} 70% 58%) 35%, hsl(${hue + 20} 55% 24%) 100%)`,
+        background: "radial-gradient(ellipse at 30% 25%, #5C3D2A 0%, #3A2015 40%, #1E0E07 100%)",
       }}
     >
-      <div className="absolute rounded-full blur-3xl opacity-60" style={{ width: "60%", height: "60%", background: `hsl(${hue + 40} 90% 72%)`, top: "-10%", left: "-10%" }} />
-      <div className="absolute rounded-full blur-3xl opacity-40" style={{ width: "50%", height: "50%", background: `hsl(${hue - 30} 85% 62%)`, bottom: "-15%", right: "-10%" }} />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-white/10" />
-      <Icon
-        className="relative z-10 drop-shadow-2xl"
-        style={{ color: "rgba(255,255,255,0.92)" }}
-        size={size === "hero" ? 64 : size === "large" ? 96 : 44}
-        strokeWidth={1.25}
-      />
+      {/* Subtle noise texture overlay */}
+      <div style={{ position: "absolute", inset: 0, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.06'/%3E%3C/svg%3E\")", opacity: 0.8 }} />
+      {/* Warm light bleed top-left */}
+      <div style={{ position: "absolute", top: "-20%", left: "-10%", width: "55%", height: "55%", borderRadius: "50%", background: "radial-gradient(circle, rgba(200,140,70,0.18) 0%, transparent 70%)" }} />
+      {/* Vignette */}
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 40%, rgba(10,4,2,0.55) 100%)" }} />
+
+      {/* "Coming Soon" — fades out on hover */}
+      <p style={{
+        position: "absolute", fontFamily: FONT_ACCENT, fontStyle: "italic",
+        fontSize: size === "hero" ? "2rem" : size === "large" ? "1.35rem" : "1rem",
+        color: "#C8A882", letterSpacing: "0.04em", textAlign: "center",
+        transition: "opacity 0.4s ease",
+        opacity: hovered ? 0 : 1,
+        pointerEvents: "none", zIndex: 2,
+      }}>
+        Coming Soon
+      </p>
+
+      {/* "Stay Tuned" — fades in on hover */}
+      <p style={{
+        position: "absolute", fontFamily: FONT_ACCENT, fontStyle: "italic",
+        fontSize: size === "hero" ? "2rem" : size === "large" ? "1.35rem" : "1rem",
+        color: "rgba(200,168,130,0.6)", letterSpacing: "0.06em", textAlign: "center",
+        transition: "opacity 0.4s ease",
+        opacity: hovered ? 1 : 0,
+        pointerEvents: "none", zIndex: 2,
+      }}>
+        Stay Tuned
+      </p>
     </div>
   );
 }
@@ -367,20 +390,15 @@ function CinematicHero({ onNav }) {
               <p className="mt-3 max-w-md mx-auto text-xs sm:text-sm font-medium" style={{ color: "#3D2E24" }}>
                 {SCENES[0].sub}
               </p>
-              <div className="mt-4 flex flex-row items-center justify-center gap-3">
-                <button onClick={() => onNav("category", "shoes")}
-                  className="px-5 py-2.5 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
+              <div className="mt-4 flex flex-row items-center justify-center">
+                <button onClick={() => onNav("contact")}
+                  className="px-10 py-2.5 rounded-full text-sm font-medium flex items-center gap-2 transition-transform hover:scale-105 active:scale-95"
                   style={{
                     background: "#3D2E24",
                     backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E\")",
                     color: "#C8A882"
                   }}>
-                  Order Now <ArrowRight size={16} />
-                </button>
-                <button onClick={() => onNav("category", "apparel")}
-                  className="px-5 py-2.5 rounded-full text-sm font-medium border"
-                  style={{ borderColor: "#3D2E24", color: "#3D2E24" }}>
-                  Explore Apparel
+                  Get Yours Now <ArrowRight size={16} />
                 </button>
               </div>
             </div>
@@ -400,8 +418,26 @@ function CinematicHero({ onNav }) {
 }
 
 /* ══════════════════════════════════════════════════════════
-   TILT CARD
+   BACK BUTTON  (shared across all non-home pages)
 ══════════════════════════════════════════════════════════ */
+function BackButton({ onBack }) {
+  return (
+    <button onClick={onBack}
+      className="flex items-center gap-2 rounded-2xl transition-transform hover:scale-[1.02] active:scale-[0.98]"
+      style={{
+        background: "rgba(62,26,11,0.06)", border: "1px solid rgba(62,26,11,0.14)",
+        padding: "0.55rem 0.95rem", cursor: "pointer", marginBottom: "1.5rem",
+      }}>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+        <path d="M9 14c0 0-3-2.5-3-5s3-5 3-5" stroke={C.inkSoft} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M6 9h9a4 4 0 0 1 0 8h-2" stroke={C.inkSoft} strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+      <span style={{ fontSize: 13, fontWeight: 600, color: C.inkSoft }}>Back</span>
+    </button>
+  );
+}
+
+
 function TiltCard({ product, onOpen, isWishlisted, onToggleWish }) {
   const ref = useRef(null);
   const [tilt, setTilt] = useState({ x: 0, y: 0, glowX: 50, glowY: 50 });
@@ -427,17 +463,20 @@ function TiltCard({ product, onOpen, isWishlisted, onToggleWish }) {
         className="relative aspect-[4/5] rounded-2xl overflow-hidden transition-transform duration-200 ease-out shadow-lg"
         style={{ transform: `rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`, boxShadow: "0 12px 30px rgba(62,26,11,0.18)" }}
       >
-        <ProductVisual hue={product.hue} category={product.category} size="large" />
+        <ProductVisual size="large" />
         <div
           className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
-          style={{ background: `radial-gradient(circle at ${tilt.glowX}% ${tilt.glowY}%, rgba(255,255,255,0.25), transparent 60%)` }}
+          style={{ background: `radial-gradient(circle at ${tilt.glowX}% ${tilt.glowY}%, rgba(200,168,130,0.12), transparent 60%)` }}
         />
         <button
           onClick={(e) => { e.stopPropagation(); onToggleWish(product.id); }}
-          className="absolute top-3 right-3 z-10 w-9 h-9 rounded-full backdrop-blur-md flex items-center justify-center transition-colors"
-          style={{ background: "rgba(74,27,12,0.35)" }}
+          className="absolute top-3 right-3 z-10 flex items-center gap-1.5 rounded-xl transition-transform hover:scale-105 active:scale-95"
+          style={{
+            background: "rgba(200,168,130,0.10)", border: "1px solid rgba(200,168,130,0.22)",
+            padding: "0.35rem 0.6rem",
+          }}
         >
-          <Heart size={16} fill={isWishlisted ? "#fff" : "none"} className="text-white" />
+          <Heart size={14} fill={isWishlisted ? "#C8A882" : "none"} stroke="#C8A882" />
         </button>
       </div>
       <div className="mt-3 flex items-start justify-between">
@@ -458,8 +497,8 @@ function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, se
   const [mobileOpen, setMobileOpen] = useState(false);
   return (
     <header className="sticky top-0 z-40" style={{
-      background: "#3D2E24",
-      backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E\")",
+      background: "radial-gradient(ellipse at 20% 0%, #4A2A14 0%, #2E1508 55%, #1E0D06 100%)",
+      boxShadow: "0 1px 0 rgba(200,140,60,0.10), 0 4px 24px rgba(10,4,2,0.35)",
     }}>
       <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
         <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: "#C8A882" }}>MBZ</button>
@@ -475,7 +514,7 @@ function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, se
           <button onClick={onCart} className="relative w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
             <ShoppingBag size={18} />
             {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#15c2c9", color: C.maroonDeep }}>{cartCount}</span>
+              <span className="absolute -top-1 -right-1 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#C8A882", color: "#1E0D06" }}>{cartCount}</span>
             )}
           </button>
           <button onClick={() => setMobileOpen((m) => !m)} className="md:hidden w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
@@ -485,7 +524,7 @@ function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, se
       </div>
 
       {searchOpen && (
-        <div className="border-t px-5 sm:px-8 py-3" style={{ borderColor: "rgba(200,168,130,0.15)", background: "#2A1F17" }}>
+        <div className="border-t px-5 sm:px-8 py-3" style={{ borderColor: "rgba(200,140,60,0.10)", background: "#1E0D06" }}>
           <div className="max-w-7xl mx-auto flex items-center gap-2">
             <Search size={16} style={{ color: "rgba(200,168,130,0.5)" }} />
             <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products..." className="bg-transparent outline-none text-sm w-full" style={{ color: "#C8A882" }} />
@@ -494,7 +533,7 @@ function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, se
       )}
 
       {mobileOpen && (
-        <div className="md:hidden border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "rgba(200,168,130,0.15)", background: "#2A1F17" }}>
+        <div className="md:hidden border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "rgba(200,140,60,0.10)", background: "#1E0D06" }}>
           {Object.entries(CATEGORY_META).map(([key, meta]) => (
             <button key={key} onClick={() => { onNav("category", key); setMobileOpen(false); }} className="text-left text-sm" style={{ color: "rgba(200,168,130,0.85)" }}>{meta.label}</button>
           ))}
@@ -1061,7 +1100,7 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
 /* ══════════════════════════════════════════════════════════
    CATEGORY PAGE
 ══════════════════════════════════════════════════════════ */
-function CategoryPage({ category, onOpenProduct, wishlist, toggleWish, query }) {
+function CategoryPage({ category, onOpenProduct, wishlist, toggleWish, query, onBack }) {
   const [sort, setSort] = useState("featured");
   const meta = CATEGORY_META[category];
 
@@ -1077,8 +1116,8 @@ function CategoryPage({ category, onOpenProduct, wishlist, toggleWish, query }) 
   return (
     <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
       <div className="mb-8">
-        <p className="text-xs tracking-[0.25em] uppercase mb-2" style={{ color: "#8a6cf0" }}>Collection</p>
-        <h1 className="text-4xl font-black" style={{ color: C.ink }}>{meta.label}</h1>
+        <BackButton onBack={onBack} />
+        <h1 className="text-4xl font-black" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic" }}>{meta.label}</h1>
       </div>
       <div className="flex items-center justify-between mb-8">
         <p className="text-sm" style={{ color: C.inkSoft }}>{products.length} products</p>
@@ -1104,7 +1143,7 @@ function CategoryPage({ category, onOpenProduct, wishlist, toggleWish, query }) 
 /* ══════════════════════════════════════════════════════════
    PRODUCT PAGE
 ══════════════════════════════════════════════════════════ */
-function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProduct }) {
+function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProduct, onBack }) {
   const product = PRODUCTS.find((p) => p.id === productId);
   const [size,  setSize]  = useState(product?.sizes[0]);
   const [qty,   setQty]   = useState(1);
@@ -1118,13 +1157,14 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
 
   return (
     <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
+      <BackButton onBack={onBack} />
       <div className="grid lg:grid-cols-2 gap-12">
         <div className="aspect-square rounded-2xl overflow-hidden">
-          <ProductVisual hue={product.hue} category={product.category} size="hero" />
+          <ProductVisual size="hero" />
         </div>
         <div>
-          <p className="text-xs tracking-[0.2em] uppercase mb-2 capitalize" style={{ color: "#8a6cf0" }}>{product.category}</p>
-          <h1 className="text-3xl sm:text-4xl font-black mb-3" style={{ color: C.ink }}>{product.name}</h1>
+          <p className="text-xs tracking-[0.2em] uppercase mb-2 capitalize" style={{ color: C.inkSoft, opacity: 0.6 }}>{product.category}</p>
+          <h1 className="text-3xl sm:text-4xl font-black mb-3" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic" }}>{product.name}</h1>
           <div className="flex items-center gap-2 mb-4">
             <div className="flex">{Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={14} fill={i < Math.round(product.rating) ? "#d9a02e" : "none"} stroke="#d9a02e" />))}</div>
             <span className="text-xs" style={{ color: C.inkSoft }}>{product.rating} ({product.reviews} reviews)</span>
@@ -1155,10 +1195,13 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
             </div>
             <button
               onClick={() => toggleWish(product.id)}
-              className="w-11 h-11 rounded-full flex items-center justify-center"
-              style={{ border: `1px solid ${C.line}`, color: C.inkSoft }}
+              className="flex items-center gap-1.5 rounded-xl transition-transform hover:scale-105 active:scale-95"
+              style={{
+                background: "rgba(62,26,11,0.06)", border: `1px solid rgba(62,26,11,0.14)`,
+                padding: "0.55rem 0.85rem",
+              }}
             >
-              <Heart size={16} fill={wishlist.has(product.id) ? C.maroon : "none"} />
+              <Heart size={16} fill={wishlist.has(product.id) ? C.maroon : "none"} stroke={C.inkSoft} />
             </button>
           </div>
 
@@ -1377,10 +1420,158 @@ function Footer() {
 }
 
 /* ══════════════════════════════════════════════════════════
+   CONTACT PAGE
+══════════════════════════════════════════════════════════ */
+function ContactPage({ onBack }) {
+  // Flying logo particles — WhatsApp, Email, LinkedIn icons as SVG paths
+  const particles = useMemo(() => Array.from({ length: 18 }, (_, i) => ({
+    id: i,
+    type: ["whatsapp", "email", "linkedin"][i % 3],
+    x: Math.random() * 100,
+    y: Math.random() * 100,
+    size: 22 + Math.random() * 22,
+    dur: 12 + Math.random() * 16,
+    delay: -(Math.random() * 20),
+    dx: (Math.random() - 0.5) * 60,
+    dy: (Math.random() - 0.5) * 60,
+    rot: Math.random() * 360,
+    drot: (Math.random() - 0.5) * 180,
+  })), []);
+
+  const iconSvg = (type, size) => {
+    if (type === "whatsapp") return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" fill="rgba(200,168,130,0.25)"/>
+        <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.978-1.405A9.953 9.953 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" stroke="rgba(200,168,130,0.25)" strokeWidth="1.5" fill="none"/>
+      </svg>
+    );
+    if (type === "email") return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <rect x="2" y="4" width="20" height="16" rx="3" stroke="rgba(200,168,130,0.25)" strokeWidth="1.5"/>
+        <path d="M2 7l10 7 10-7" stroke="rgba(200,168,130,0.25)" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    );
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+        <rect x="2" y="2" width="20" height="20" rx="5" stroke="rgba(200,168,130,0.25)" strokeWidth="1.5"/>
+        <path d="M7 10v7M7 7v.01M12 17v-4c0-1.5.5-3 3-3s3 1.5 3 3v4M12 10v7" stroke="rgba(200,168,130,0.25)" strokeWidth="1.5" strokeLinecap="round"/>
+      </svg>
+    );
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden"
+      style={{ background: `radial-gradient(ellipse at 40% 40%, #3A1E10 0%, #2A1208 40%, #1A0A04 100%)` }}>
+
+      {/* Back button */}
+      <button onClick={onBack}
+        className="flex items-center gap-2 rounded-2xl transition-transform hover:scale-[1.02] active:scale-[0.98]"
+        style={{
+          position: "absolute", top: "1.25rem", left: "1.25rem", zIndex: 20,
+          background: "rgba(200,168,130,0.08)", border: "1px solid rgba(200,168,130,0.18)",
+          padding: "0.6rem 1rem", cursor: "pointer",
+        }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M9 14c0 0-3-2.5-3-5s3-5 3-5" stroke="#C8A882" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M6 9h9a4 4 0 0 1 0 8h-2" stroke="#C8A882" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "#C8A882" }}>Back</span>
+      </button>
+
+      {/* Animated background particles */}
+      <style>{`
+        @keyframes floatParticle {
+          0%   { transform: translate(0, 0) rotate(0deg); opacity: 0; }
+          10%  { opacity: 1; }
+          90%  { opacity: 1; }
+          100% { transform: translate(var(--dx), var(--dy)) rotate(var(--drot)); opacity: 0; }
+        }
+      `}</style>
+
+      {particles.map(p => (
+        <div key={p.id} style={{
+          position: "absolute",
+          left: `${p.x}%`, top: `${p.y}%`,
+          "--dx": `${p.dx}px`, "--dy": `${p.dy}px`, "--drot": `${p.drot}deg`,
+          animation: `floatParticle ${p.dur}s ${p.delay}s ease-in-out infinite`,
+          pointerEvents: "none",
+          transform: `rotate(${p.rot}deg)`,
+        }}>
+          {iconSvg(p.type, p.size)}
+        </div>
+      ))}
+
+      {/* Subtle radial vignette */}
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 40%, rgba(10,4,2,0.6) 100%)", pointerEvents: "none" }} />
+
+      {/* Contact card */}
+      <div className="relative z-10 flex flex-col items-center text-center px-8" style={{ maxWidth: 480, width: "100%" }}>
+        <p style={{ fontSize: 11, letterSpacing: "0.25em", textTransform: "uppercase", color: "#C8A882", opacity: 0.7, marginBottom: 12 }}>Get In Touch</p>
+        <h1 className="font-black mb-10" style={{ fontSize: "clamp(2rem,6vw,3rem)", color: "#F5EFE6", fontFamily: FONT_BODY, lineHeight: 1.1 }}>
+          Let's Connect
+        </h1>
+
+        <div className="flex flex-col gap-5 w-full">
+          {/* WhatsApp */}
+          <a href="https://wa.me/923124919510" target="_blank" rel="noreferrer"
+            className="flex items-center gap-4 rounded-2xl transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: "rgba(200,168,130,0.08)", border: "1px solid rgba(200,168,130,0.18)", padding: "1rem 1.4rem", textDecoration: "none" }}>
+            <div style={{ width: 42, height: 42, borderRadius: "50%", background: "rgba(200,168,130,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z" fill="#C8A882"/>
+                <path d="M12 2C6.477 2 2 6.477 2 12c0 1.89.525 3.66 1.438 5.168L2 22l4.978-1.405A9.953 9.953 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2z" stroke="#C8A882" strokeWidth="1.5" fill="none"/>
+              </svg>
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <p style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "#C8A882", opacity: 0.6, marginBottom: 2 }}>WhatsApp</p>
+              <p style={{ fontSize: 15, fontWeight: 600, color: "#F5EFE6" }}>03124919510</p>
+            </div>
+          </a>
+
+          {/* Email */}
+          <a href="mailto:muhammadbinzain123@gmail.com"
+            className="flex items-center gap-4 rounded-2xl transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: "rgba(200,168,130,0.08)", border: "1px solid rgba(200,168,130,0.18)", padding: "1rem 1.4rem", textDecoration: "none" }}>
+            <div style={{ width: 42, height: 42, borderRadius: "50%", background: "rgba(200,168,130,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="4" width="20" height="16" rx="3" stroke="#C8A882" strokeWidth="1.5"/>
+                <path d="M2 7l10 7 10-7" stroke="#C8A882" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <p style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "#C8A882", opacity: 0.6, marginBottom: 2 }}>Email</p>
+              <p style={{ fontSize: 14, fontWeight: 600, color: "#F5EFE6" }}>muhammadbinzain123@gmail.com</p>
+            </div>
+          </a>
+
+          {/* LinkedIn */}
+          <a href="https://www.linkedin.com/in/muhammad-bin-zain-a8650a417?utm_source=share_via&utm_content=profile&utm_medium=member_android"
+            target="_blank" rel="noreferrer"
+            className="flex items-center gap-4 rounded-2xl transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            style={{ background: "rgba(200,168,130,0.08)", border: "1px solid rgba(200,168,130,0.18)", padding: "1rem 1.4rem", textDecoration: "none" }}>
+            <div style={{ width: 42, height: 42, borderRadius: "50%", background: "rgba(200,168,130,0.12)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <rect x="2" y="2" width="20" height="20" rx="5" stroke="#C8A882" strokeWidth="1.5"/>
+                <path d="M7 10v7M7 7v.01M12 17v-4c0-1.5.5-3 3-3s3 1.5 3 3v4M12 10v7" stroke="#C8A882" strokeWidth="1.5" strokeLinecap="round"/>
+              </svg>
+            </div>
+            <div style={{ textAlign: "left" }}>
+              <p style={{ fontSize: 10, letterSpacing: "0.15em", textTransform: "uppercase", color: "#C8A882", opacity: 0.6, marginBottom: 2 }}>LinkedIn</p>
+              <p style={{ fontSize: 15, fontWeight: 600, color: "#F5EFE6" }}>Muhammad Bin Zain</p>
+            </div>
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    APP ROOT
 ══════════════════════════════════════════════════════════ */
 export default function App() {
   const [view,       setView]       = useState("home");
+  const [prevView,   setPrevView]   = useState("home");
   const [category,   setCategory]   = useState("shoes");
   const [productId,  setProductId]  = useState(null);
   const [cart,       setCart]       = useState([]);
@@ -1391,6 +1582,7 @@ export default function App() {
   const [orderTotal, setOrderTotal] = useState(0);
 
   const handleNav = (v, cat) => {
+    setPrevView(view);
     setView(v);
     if (cat) setCategory(cat);
     setCartOpen(false);
@@ -1428,12 +1620,13 @@ export default function App() {
       <Navbar cartCount={cartCount} onNav={handleNav} onCart={() => setCartOpen(true)} searchOpen={searchOpen} setSearchOpen={setSearchOpen} query={query} setQuery={setQuery} />
 
       {view === "home"     && <HomePage     onNav={handleNav} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} />}
-      {view === "category" && <CategoryPage category={category} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} query={query} />}
-      {view === "product"  && <ProductPage  productId={productId} onAddToCart={addToCart} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={openProduct} />}
+      {view === "category" && <CategoryPage category={category} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} query={query} onBack={() => handleNav(prevView)} />}
+      {view === "product"  && <ProductPage  productId={productId} onAddToCart={addToCart} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={openProduct} onBack={() => handleNav(prevView)} />}
       {view === "checkout" && <CheckoutPage cart={cart} onComplete={handleCheckoutComplete} onBack={() => { setView("home"); setCartOpen(true); }} />}
       {view === "success"  && <SuccessPage  total={orderTotal} onContinue={() => handleNav("home")} />}
+      {view === "contact"  && <ContactPage onBack={() => handleNav(prevView)} />}
 
-      {view !== "success" && <Footer />}
+      {view !== "success" && view !== "contact" && <Footer />}
 
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} updateQty={updateQty} removeItem={removeItem}
         onCheckout={() => { setCartOpen(false); setView("checkout"); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
