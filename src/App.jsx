@@ -903,26 +903,21 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
       onContextMenu={(e) => e.preventDefault()}
-      className="relative text-left"
-      style={{ opacity: 0, aspectRatio: "4/3", touchAction: "pan-y", background: "none", border: "none" }}
+      style={{
+        opacity: 0, aspectRatio: "4/3", touchAction: "pan-y",
+        background: "none", border: "none", padding: 0,
+        position: "relative", borderRadius: "1rem", overflow: "hidden", display: "block",
+      }}
     >
-      {/* Canvas fills the button entirely */}
-      <div style={{ position: "absolute", inset: 0, overflow: "hidden", borderRadius: "1rem" }}>
-        <canvas
-          ref={canvasRef}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{
-            position: "absolute", inset: 0, width: "100%", height: "100%",
-            touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
-            display: "block",
-          }}
-        />
-      </div>
-      {/* Picture frame — sits on top, covers the video's own white edges with bg colour + rounds corners */}
-      <div style={{
-        position: "absolute", inset: 0, borderRadius: "1rem", pointerEvents: "none",
-        boxShadow: "inset 0 0 0 6px #ECEAE5",
-      }} />
+      <canvas
+        ref={canvasRef}
+        onContextMenu={(e) => e.preventDefault()}
+        style={{
+          position: "absolute", inset: 0, width: "100%", height: "100%",
+          touchAction: "pan-y", userSelect: "none", WebkitUserSelect: "none",
+          display: "block",
+        }}
+      />
     </button>
   );
 }
