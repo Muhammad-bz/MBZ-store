@@ -25,7 +25,7 @@ const FONT_ACCENT = "'Playfair Display', serif";
 function GlobalFonts() {
   return (
     <style>{`
-      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital@1&family=Plus+Jakarta+Sans:wght@500;700;800;900&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,400;1,700;1,900&family=Plus+Jakarta+Sans:wght@500;700;800;900&display=swap');
       @keyframes rackHang  { 0%, 100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
       @keyframes hintPulse { 0%, 100% { opacity: 0.5; transform: translateY(0); } 50% { opacity: 1; transform: translateY(4px); } }
     `}</style>
@@ -1183,10 +1183,13 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
         <CategorySection onNav={onNav} />
 
         <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
-          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-10">
-            <div className="flex items-end justify-between mb-6">
-              <h2 className="text-2xl font-black" style={{ color: "#C8A882" }}>Featured</h2>
-              <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: "rgba(200,168,130,0.6)" }}>View all <ArrowRight size={14} /></button>
+          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
+            <div className="mb-8">
+              <h1 className="text-4xl font-black" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic" }}>Featured</h1>
+              <div className="flex items-center justify-between mt-2">
+                <p className="text-sm" style={{ color: C.inkSoft }}>{featured.length} products</p>
+                <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
+              </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
               {featured.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />))}
