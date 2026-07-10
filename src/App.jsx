@@ -491,55 +491,165 @@ function TiltCard({ product, onOpen, isWishlisted, onToggleWish }) {
 }
 
 /* ══════════════════════════════════════════════════════════
-   NAVBAR
+   GLASS MODAL  (shared centered overlay)
 ══════════════════════════════════════════════════════════ */
-function Navbar({ cartCount, onNav, onCart, searchOpen, setSearchOpen, query, setQuery }) {
-  const [mobileOpen, setMobileOpen] = useState(false);
+function GlassModal({ onClose, title, children }) {
+  // Close on Escape
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, [onClose]);
+
   return (
-    <header className="sticky top-0 z-40" style={{
-      background: "radial-gradient(ellipse at 20% 0%, #4A2A14 0%, #2E1508 55%, #1E0D06 100%)",
-      boxShadow: "0 1px 0 rgba(200,140,60,0.10), 0 4px 24px rgba(10,4,2,0.35)",
-    }}>
-      <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-        <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: "#C8A882" }}>MBZ</button>
-
-        <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "rgba(200,168,130,0.7)" }}>
-          {Object.entries(CATEGORY_META).map(([key, meta]) => (
-            <button key={key} onClick={() => onNav("category", key)} className="hover:opacity-100 transition-opacity" style={{ color: "inherit" }}>{meta.label}</button>
-          ))}
-        </nav>
-
-        <div className="flex items-center gap-2">
-          <button onClick={() => setSearchOpen((s) => !s)} className="w-9 h-9 rounded-full flex items-center justify-center transition-colors" style={{ color: "#C8A882" }}><Search size={18} /></button>
-          <button onClick={onCart} className="relative w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
-            <ShoppingBag size={18} />
-            {cartCount > 0 && (
-              <span className="absolute -top-1 -right-1 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#C8A882", color: "#1E0D06" }}>{cartCount}</span>
-            )}
-          </button>
-          <button onClick={() => setMobileOpen((m) => !m)} className="md:hidden w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
-            {mobileOpen ? <X size={18} /> : <Menu size={18} />}
-          </button>
-        </div>
-      </div>
-
-      {searchOpen && (
-        <div className="border-t px-5 sm:px-8 py-3" style={{ borderColor: "rgba(200,140,60,0.10)", background: "#1E0D06" }}>
-          <div className="max-w-7xl mx-auto flex items-center gap-2">
-            <Search size={16} style={{ color: "rgba(200,168,130,0.5)" }} />
-            <input autoFocus value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products..." className="bg-transparent outline-none text-sm w-full" style={{ color: "#C8A882" }} />
+    <>
+      <style>{`
+        @keyframes gmFadeIn  { from { opacity:0; } to { opacity:1; } }
+        @keyframes gmScaleIn { from { opacity:0; transform:scale(0.94) translateY(10px); } to { opacity:1; transform:scale(1) translateY(0); } }
+      `}</style>
+      {/* Backdrop */}
+      <div onClick={onClose} style={{
+        position: "fixed", inset: 0, zIndex: 60,
+        background: "rgba(10,4,2,0.60)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        animation: "gmFadeIn 0.22s ease",
+      }} />
+      {/* Centered card */}
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 61,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "1.5rem",
+        pointerEvents: "none",
+      }}>
+        <div style={{
+          width: "100%", maxWidth: 420,
+          background: "rgba(38,16,6,0.78)",
+          backdropFilter: "blur(32px)",
+          WebkitBackdropFilter: "blur(32px)",
+          border: "1px solid rgba(200,140,60,0.18)",
+          borderRadius: "1.75rem",
+          boxShadow: "0 24px 64px rgba(5,2,1,0.7)",
+          animation: "gmScaleIn 0.28s cubic-bezier(0.22,1,0.36,1)",
+          pointerEvents: "all",
+          overflow: "hidden",
+        }}>
+          {/* Header */}
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            padding: "1.1rem 1.4rem",
+            borderBottom: "1px solid rgba(200,140,60,0.10)",
+          }}>
+            <span style={{ fontSize: 13, letterSpacing: "0.18em", textTransform: "uppercase", color: "#C8A882", opacity: 0.7 }}>{title}</span>
+            <button onClick={onClose} style={{
+              width: 32, height: 32, borderRadius: "50%",
+              background: "rgba(200,168,130,0.08)", border: "1px solid rgba(200,168,130,0.18)",
+              color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+            }}>
+              <X size={15} />
+            </button>
+          </div>
+          {/* Body */}
+          <div style={{ padding: "1.2rem 1.4rem 1.5rem" }}>
+            {children}
           </div>
         </div>
+      </div>
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   NAVBAR
+══════════════════════════════════════════════════════════ */
+function Navbar({ cartCount, wishlist, onNav, onCart, onWishlist, query, setQuery }) {
+  const [panel, setPanel] = useState(null); // null | "menu" | "search"
+  const closePanel = () => setPanel(null);
+
+  return (
+    <>
+      <header className="sticky top-0 z-40" style={{
+        background: "radial-gradient(ellipse at 20% 0%, #4A2A14 0%, #2E1508 55%, #1E0D06 100%)",
+        boxShadow: "0 1px 0 rgba(200,140,60,0.10), 0 4px 24px rgba(10,4,2,0.35)",
+      }}>
+        <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+          <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: "#C8A882", fontFamily: FONT_ACCENT, fontStyle: "italic" }}>MBZ</button>
+
+          <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "rgba(200,168,130,0.7)" }}>
+            {Object.entries(CATEGORY_META).map(([key, meta]) => (
+              <button key={key} onClick={() => onNav("category", key)} className="hover:opacity-100 transition-opacity" style={{ color: "inherit" }}>{meta.label}</button>
+            ))}
+          </nav>
+
+          <div className="flex items-center gap-1">
+            {/* Search */}
+            <button onClick={() => setPanel(p => p === "search" ? null : "search")}
+              className="w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
+              <Search size={18} />
+            </button>
+
+            {/* Wishlist */}
+            <button onClick={onWishlist} className="relative w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
+              <Heart size={18} />
+              {wishlist.size > 0 && (
+                <span className="absolute -top-1 -right-1 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#C8A882", color: "#1E0D06" }}>{wishlist.size}</span>
+              )}
+            </button>
+
+            {/* Cart */}
+            <button onClick={onCart} className="relative w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
+              <ShoppingBag size={18} />
+              {cartCount > 0 && (
+                <span className="absolute -top-1 -right-1 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#C8A882", color: "#1E0D06" }}>{cartCount}</span>
+              )}
+            </button>
+
+            {/* Menu (mobile) */}
+            <button onClick={() => setPanel(p => p === "menu" ? null : "menu")}
+              className="md:hidden w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
+              <Menu size={18} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* ── Menu modal ── */}
+      {panel === "menu" && (
+        <GlassModal onClose={closePanel} title="Navigate">
+          <div className="flex flex-col gap-3">
+            {Object.entries(CATEGORY_META).map(([key, meta]) => (
+              <button key={key}
+                onClick={() => { closePanel(); onNav("category", key); }}
+                className="flex items-center gap-4 rounded-2xl text-left transition-transform hover:scale-[1.01] active:scale-[0.99]"
+                style={{ padding: "0.85rem 1.1rem", background: "rgba(200,168,130,0.06)", border: "1px solid rgba(200,168,130,0.12)" }}>
+                <span style={{ fontSize: 15, fontWeight: 600, color: "#F5EFE6", fontFamily: FONT_ACCENT, fontStyle: "italic" }}>{meta.label}</span>
+              </button>
+            ))}
+          </div>
+        </GlassModal>
       )}
 
-      {mobileOpen && (
-        <div className="md:hidden border-t px-5 py-4 flex flex-col gap-3" style={{ borderColor: "rgba(200,140,60,0.10)", background: "#1E0D06" }}>
-          {Object.entries(CATEGORY_META).map(([key, meta]) => (
-            <button key={key} onClick={() => { onNav("category", key); setMobileOpen(false); }} className="text-left text-sm" style={{ color: "rgba(200,168,130,0.85)" }}>{meta.label}</button>
-          ))}
-        </div>
+      {/* ── Search modal ── */}
+      {panel === "search" && (
+        <GlassModal onClose={closePanel} title="Search">
+          <div className="flex items-center gap-3 rounded-2xl px-4 py-3"
+            style={{ background: "rgba(200,168,130,0.07)", border: "1px solid rgba(200,168,130,0.18)" }}>
+            <Search size={16} style={{ color: "rgba(200,168,130,0.55)", flexShrink: 0 }} />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search products…"
+              className="bg-transparent outline-none text-sm w-full"
+              style={{ color: "#C8A882" }}
+            />
+            {query && (
+              <button onClick={() => setQuery("")} style={{ color: "rgba(200,168,130,0.5)", flexShrink: 0 }}><X size={14} /></button>
+            )}
+          </div>
+        </GlassModal>
       )}
-    </header>
+    </>
   );
 }
 
@@ -1251,50 +1361,91 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
 }
 
 /* ══════════════════════════════════════════════════════════
-   CART DRAWER
+   CART MODAL  (glass centered)
 ══════════════════════════════════════════════════════════ */
 function CartDrawer({ open, onClose, cart, updateQty, removeItem, onCheckout }) {
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
+  if (!open) return null;
   return (
-    <div className={`fixed inset-0 z-50 transition-opacity ${open ? "opacity-100" : "opacity-0 pointer-events-none"}`}>
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
-      <div className={`absolute right-0 top-0 h-full w-full sm:w-[420px] flex flex-col transition-transform duration-300 ${open ? "translate-x-0" : "translate-x-full"}`} style={{ background: C.bg, borderLeft: `1px solid ${C.line}` }}>
-        <div className="flex items-center justify-between p-5" style={{ borderBottom: `1px solid ${C.line}` }}>
-          <h2 className="text-lg font-semibold" style={{ color: C.ink }}>Your Cart ({cart.length})</h2>
-          <button onClick={onClose} style={{ color: C.inkSoft }}><X size={20} /></button>
-        </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {cart.length === 0 && <p className="text-sm text-center mt-12" style={{ color: C.inkSoft, opacity: 0.6 }}>Your cart is empty.</p>}
-          {cart.map((item) => (
-            <div key={`${item.id}-${item.size}`} className="flex gap-4">
-              <div className="w-20 h-20 rounded-lg overflow-hidden flex-shrink-0"><ProductVisual hue={item.hue} category={item.category} /></div>
-              <div className="flex-1">
-                <div className="flex justify-between">
-                  <p className="text-sm font-medium" style={{ color: C.ink }}>{item.name}</p>
-                  <button onClick={() => removeItem(item.id, item.size)} style={{ color: C.inkSoft }}><X size={14} /></button>
+    <GlassModal onClose={onClose} title={`Cart · ${cart.length} item${cart.length !== 1 ? "s" : ""}`}>
+      <div style={{ maxHeight: "55vh", overflowY: "auto", marginBottom: cart.length > 0 ? "1rem" : 0 }}>
+        {cart.length === 0 && (
+          <p style={{ color: "rgba(200,168,130,0.5)", fontSize: 14, textAlign: "center", padding: "2rem 0" }}>Your cart is empty.</p>
+        )}
+        {cart.map((item) => (
+          <div key={`${item.id}-${item.size}`} style={{ display: "flex", gap: 12, marginBottom: 12, padding: "0.75rem", background: "rgba(200,168,130,0.05)", border: "1px solid rgba(200,168,130,0.10)", borderRadius: "1rem" }}>
+            <div style={{ width: 56, height: 56, borderRadius: "0.75rem", overflow: "hidden", flexShrink: 0 }}>
+              <ProductVisual />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "#F5EFE6" }}>{item.name}</p>
+                <button onClick={() => removeItem(item.id, item.size)} style={{ color: "rgba(200,168,130,0.45)", cursor: "pointer" }}><X size={13} /></button>
+              </div>
+              <p style={{ fontSize: 11, color: "rgba(200,168,130,0.5)", marginBottom: 6 }}>Size {item.size}</p>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, background: "rgba(200,168,130,0.08)", border: "1px solid rgba(200,168,130,0.15)", borderRadius: "999px", padding: "2px 8px" }}>
+                  <button onClick={() => updateQty(item.id, item.size, -1)} style={{ color: "#C8A882", cursor: "pointer" }}><Minus size={11} /></button>
+                  <span style={{ fontSize: 12, color: "#F5EFE6", minWidth: 16, textAlign: "center" }}>{item.qty}</span>
+                  <button onClick={() => updateQty(item.id, item.size, 1)} style={{ color: "#C8A882", cursor: "pointer" }}><Plus size={11} /></button>
                 </div>
-                <p className="text-xs" style={{ color: C.inkSoft, opacity: 0.7 }}>Size {item.size}</p>
-                <div className="flex items-center justify-between mt-2">
-                  <div className="flex items-center rounded-full" style={{ border: `1px solid ${C.line}` }}>
-                    <button onClick={() => updateQty(item.id, item.size, -1)} className="w-7 h-7 flex items-center justify-center" style={{ color: C.inkSoft }}><Minus size={12} /></button>
-                    <span className="w-6 text-center text-xs" style={{ color: C.ink }}>{item.qty}</span>
-                    <button onClick={() => updateQty(item.id, item.size, 1)} className="w-7 h-7 flex items-center justify-center" style={{ color: C.inkSoft }}><Plus size={12} /></button>
-                  </div>
-                  <p className="text-sm" style={{ color: C.ink }}>{fmt(item.price * item.qty)}</p>
-                </div>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "#C8A882" }}>{fmt(item.price * item.qty)}</p>
               </div>
             </div>
-          ))}
-        </div>
-        {cart.length > 0 && (
-          <div className="p-5" style={{ borderTop: `1px solid ${C.line}` }}>
-            <div className="flex justify-between text-sm mb-2" style={{ color: C.inkSoft }}><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-            <div className="flex justify-between text-sm mb-4" style={{ color: C.inkSoft }}><span>Shipping</span><span>{subtotal > 75 ? "Free" : fmt(8)}</span></div>
-            <button onClick={onCheckout} className="w-full py-3.5 rounded-full font-medium transition-transform hover:scale-[1.02]" style={{ background: C.maroon, color: C.bgSoft }}>Checkout</button>
           </div>
-        )}
+        ))}
       </div>
-    </div>
+      {cart.length > 0 && (
+        <div style={{ borderTop: "1px solid rgba(200,140,60,0.10)", paddingTop: "1rem" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "rgba(200,168,130,0.6)", marginBottom: 6 }}>
+            <span>Subtotal</span><span>{fmt(subtotal)}</span>
+          </div>
+          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, color: "rgba(200,168,130,0.6)", marginBottom: 14 }}>
+            <span>Shipping</span><span>{subtotal > 75 ? "Free" : fmt(8)}</span>
+          </div>
+          <button onClick={onCheckout}
+            className="w-full transition-transform hover:scale-[1.02] active:scale-[0.98]"
+            style={{ padding: "0.85rem", borderRadius: "999px", background: "rgba(200,168,130,0.15)", border: "1px solid rgba(200,168,130,0.3)", color: "#F5EFE6", fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            Checkout → {fmt(subtotal + (subtotal > 75 ? 0 : 8))}
+          </button>
+        </div>
+      )}
+    </GlassModal>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
+   WISHLIST MODAL  (glass centered)
+══════════════════════════════════════════════════════════ */
+function WishlistModal({ open, onClose, wishlist, toggleWish, onOpenProduct }) {
+  if (!open) return null;
+  const wishlisted = PRODUCTS.filter(p => wishlist.has(p.id));
+  return (
+    <GlassModal onClose={onClose} title={`Wishlist · ${wishlisted.length}`}>
+      <div style={{ maxHeight: "55vh", overflowY: "auto" }}>
+        {wishlisted.length === 0 && (
+          <p style={{ color: "rgba(200,168,130,0.5)", fontSize: 14, textAlign: "center", padding: "2rem 0" }}>Nothing saved yet.</p>
+        )}
+        {wishlisted.map((item) => (
+          <div key={item.id} style={{ display: "flex", gap: 12, marginBottom: 12, padding: "0.75rem", background: "rgba(200,168,130,0.05)", border: "1px solid rgba(200,168,130,0.10)", borderRadius: "1rem", cursor: "pointer" }}
+            onClick={() => { onClose(); onOpenProduct(item.id); }}>
+            <div style={{ width: 56, height: 56, borderRadius: "0.75rem", overflow: "hidden", flexShrink: 0 }}>
+              <ProductVisual />
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: "#F5EFE6" }}>{item.name}</p>
+                <button onClick={(e) => { e.stopPropagation(); toggleWish(item.id); }} style={{ color: "rgba(200,168,130,0.45)", cursor: "pointer" }}>
+                  <Heart size={13} fill="#C8A882" stroke="#C8A882" />
+                </button>
+              </div>
+              <p style={{ fontSize: 11, color: "rgba(200,168,130,0.5)", marginTop: 2, textTransform: "capitalize" }}>{item.category}</p>
+              <p style={{ fontSize: 13, fontWeight: 600, color: "#C8A882", marginTop: 4 }}>{fmt(item.price)}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </GlassModal>
   );
 }
 
@@ -1576,8 +1727,9 @@ export default function App() {
   const [productId,  setProductId]  = useState(null);
   const [cart,       setCart]       = useState([]);
   const [wishlist,   setWishlist]   = useState(new Set());
-  const [cartOpen,   setCartOpen]   = useState(false);
-  const [searchOpen, setSearchOpen] = useState(false);
+  const [cartOpen,      setCartOpen]      = useState(false);
+  const [wishlistOpen,  setWishlistOpen]  = useState(false);
+  const [searchOpen,    setSearchOpen]    = useState(false);
   const [query,      setQuery]      = useState("");
   const [orderTotal, setOrderTotal] = useState(0);
 
@@ -1617,7 +1769,7 @@ export default function App() {
   return (
     <div className="min-h-screen font-sans" style={{ background: C.bg, color: C.ink, fontFamily: FONT_BODY }}>
       <GlobalFonts />
-      <Navbar cartCount={cartCount} onNav={handleNav} onCart={() => setCartOpen(true)} searchOpen={searchOpen} setSearchOpen={setSearchOpen} query={query} setQuery={setQuery} />
+      <Navbar cartCount={cartCount} wishlist={wishlist} onNav={handleNav} onCart={() => setCartOpen(true)} onWishlist={() => setWishlistOpen(true)} query={query} setQuery={setQuery} />
 
       {view === "home"     && <HomePage     onNav={handleNav} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} />}
       {view === "category" && <CategoryPage category={category} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} query={query} onBack={() => handleNav(prevView)} />}
@@ -1630,6 +1782,7 @@ export default function App() {
 
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} updateQty={updateQty} removeItem={removeItem}
         onCheckout={() => { setCartOpen(false); setView("checkout"); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
+      <WishlistModal open={wishlistOpen} onClose={() => setWishlistOpen(false)} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={(id) => { setWishlistOpen(false); openProduct(id); }} />
     </div>
   );
 }
