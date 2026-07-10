@@ -904,10 +904,10 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
       onMouseLeave={handleMouseLeave}
       onContextMenu={(e) => e.preventDefault()}
       className="relative rounded-2xl text-left"
-      style={{ opacity: 0, aspectRatio: "4/3", touchAction: "pan-y" }}
+      style={{ opacity: 0, aspectRatio: "4/3", touchAction: "pan-y", background: "none", border: "none" }}
     >
       {/* Invisible clipping frame — rounds and crops the canvas with no background */}
-      <div style={{ position: "absolute", inset: 0, borderRadius: "1rem", overflow: "hidden" }}>
+      <div style={{ position: "absolute", inset: "-1px", borderRadius: "1rem", overflow: "hidden" }}>
         <canvas
           ref={canvasRef}
           onContextMenu={(e) => e.preventDefault()}
