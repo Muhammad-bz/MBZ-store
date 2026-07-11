@@ -33,6 +33,68 @@ function GlobalFonts() {
 }
 
 /* ══════════════════════════════════════════════════════════
+   SCROLL REVEAL HOOK
+   ── Watches an element's position; calls back with a 0→1
+      progress value so callers can drive opacity + translate.
+   ── Reverses on scroll-up (progress goes back down).
+   ── Single IntersectionObserver + passive scroll listener
+      per instance — cheap on mobile.
+══════════════════════════════════════════════════════════ */
+function useScrollReveal(ref, { offset = 0.15, speed = 0.65 } = {}) {
+  const [p, setP] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const calc = () => {
+      const { top, height } = el.getBoundingClientRect();
+      const vh = window.innerHeight;
+      const raw = (vh - top) / (vh * speed + height * offset);
+      setP(Math.min(1, Math.max(0, raw)));
+    };
+    calc();
+    window.addEventListener("scroll", calc, { passive: true });
+    window.addEventListener("resize", calc, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", calc);
+      window.removeEventListener("resize", calc);
+    };
+  }, []);
+  return p;
+}
+
+/* Wrap a child with a reveal animation driven by scroll progress.
+   dir: "up" | "down" | "left" | "right"
+   distance: px to travel
+   delay: ms stagger offset (CSS transition-delay) */
+function Reveal({ children, dir = "up", distance = 40, delay = 0, style: extraStyle }) {
+  const ref  = useRef(null);
+  const p    = useScrollReveal(ref);
+  const ease = 1 - Math.pow(1 - p, 3); // cubic ease-out
+
+  const tx = dir === "left"  ? `${(1 - ease) *  distance}px`
+           : dir === "right" ? `${(1 - ease) * -distance}px`
+           : "0px";
+  const ty = dir === "up"   ? `${(1 - ease) *  distance}px`
+           : dir === "down" ? `${(1 - ease) * -distance}px`
+           : "0px";
+
+  return (
+    <div
+      ref={ref}
+      style={{
+        opacity: ease,
+        transform: `translate(${tx}, ${ty})`,
+        transition: `opacity 0.55s ease ${delay}ms, transform 0.55s ease ${delay}ms`,
+        willChange: "opacity, transform",
+        ...extraStyle,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════════════════════
    DATA
 ══════════════════════════════════════════════════════════ */
 const CATEGORY_META = {
@@ -1073,6 +1135,7 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
 
   return (
     <button
+      ref={(el) => { cardRefs.current[index] = el; }}
       onClick={() => onNav("category", cardKey)}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -1085,9 +1148,9 @@ function CategoryCard({ cardKey, card, index, cardRefs, onNav }) {
         isolation: "isolate",
         WebkitMaskImage: "-webkit-radial-gradient(white, black)",
         transform: "translateZ(0)",
+        opacity: 0,
       }}
     >
-      {/* Canvas — 1px outset so sub-pixel anti-aliasing never shows background */}
       <canvas
         ref={canvasRef}
         onContextMenu={(e) => e.preventDefault()}
@@ -1123,26 +1186,20 @@ function CategorySection({ onNav }) {
           return ease((vh - top) / (vh * 0.65));
         };
         const p0 = cp(acc), p1 = cp(apparel), p2 = cp(shoes);
-        const x0 = Math.max(-110, Math.min(0, (1 - p0) * -110));
-        const y1 = Math.max(0, Math.min(80, (1 - p1) * 80));
-        const x2 = Math.max(0, Math.min(110, (1 - p2) * 110));
-        acc.style.transform     = `translateX(${x0}%)`;
+        acc.style.transform     = `translateX(${Math.max(-110, Math.min(0, (1-p0)*-110))}%)`;
         acc.style.opacity       = p0.toFixed(3);
-        apparel.style.transform = `translateY(${y1}%)`;
+        apparel.style.transform = `translateY(${Math.max(0, Math.min(80, (1-p1)*80))}%)`;
         apparel.style.opacity   = p1.toFixed(3);
-        shoes.style.transform   = `translateX(${x2}%)`;
+        shoes.style.transform   = `translateX(${Math.max(0, Math.min(110, (1-p2)*110))}%)`;
         shoes.style.opacity     = p2.toFixed(3);
       } else {
         const { top } = sectionRef.current.getBoundingClientRect();
         const p = ease((vh - top) / (vh * 0.6));
-        const x = Math.max(-110, Math.min(0, (1 - p) * -110));
-        const y = Math.max(0, Math.min(80, (1 - p) * 80));
-        const x2 = Math.max(0, Math.min(110, (1 - p) * 110));
-        acc.style.transform     = `translateX(${x}%)`;
+        acc.style.transform     = `translateX(${Math.max(-110, Math.min(0, (1-p)*-110))}%)`;
         acc.style.opacity       = p.toFixed(3);
-        apparel.style.transform = `translateY(${y}%)`;
+        apparel.style.transform = `translateY(${Math.max(0, Math.min(80, (1-p)*80))}%)`;
         apparel.style.opacity   = p.toFixed(3);
-        shoes.style.transform   = `translateX(${x2}%)`;
+        shoes.style.transform   = `translateX(${Math.max(0, Math.min(110, (1-p)*110))}%)`;
         shoes.style.opacity     = p.toFixed(3);
       }
     };
@@ -1155,9 +1212,7 @@ function CategorySection({ onNav }) {
     };
 
     cardRefs.current.forEach((el) => {
-      if (el) {
-        el.style.opacity = "0";
-      }
+      if (el) { el.style.opacity = "0"; el.style.willChange = "transform, opacity"; }
     });
     window.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("resize", onScroll, { passive: true });
@@ -1175,9 +1230,7 @@ function CategorySection({ onNav }) {
       <section ref={sectionRef} className="max-w-7xl mx-auto px-4 sm:px-8 py-10 sm:py-16">
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
           {Object.entries(CATEGORY_CARDS).map(([key, card], i) => (
-            <div key={key} ref={(el) => { cardRefs.current[i] = el; }} style={{ willChange: "transform, opacity" }}>
-              <CategoryCard cardKey={key} card={card} index={i} cardRefs={{ current: [] }} onNav={onNav} />
-            </div>
+            <CategoryCard key={key} cardKey={key} card={card} index={i} cardRefs={cardRefs} onNav={onNav} />
           ))}
         </div>
       </section>
@@ -1199,15 +1252,24 @@ function HomePage({ onNav, onOpenProduct, wishlist, toggleWish }) {
 
         <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
-            <div className="mb-8">
-              <h1 className="text-4xl" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400 }}>Featured</h1>
-              <div className="flex items-center justify-between mt-2">
-                <p className="text-sm" style={{ color: C.inkSoft }}>{featured.length} products</p>
-                <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
+            <Reveal dir="up" distance={30}>
+              <div className="mb-8">
+                <h1 className="text-4xl" style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400 }}>Featured</h1>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-sm" style={{ color: C.inkSoft }}>{featured.length} products</p>
+                  <button onClick={() => onNav("category", "shoes")} className="text-sm flex items-center gap-1" style={{ color: C.inkSoft }}>View all <ArrowRight size={14} /></button>
+                </div>
               </div>
-            </div>
+            </Reveal>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-5">
-              {featured.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />))}
+              {featured.map((p, i) => {
+                const dir = i < featured.length / 2 ? "left" : "right";
+                return (
+                  <Reveal key={p.id} dir={dir} distance={60} delay={i * 60}>
+                    <TiltCard product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />
+                  </Reveal>
+                );
+              })}
             </div>
           </div>
         </section>
@@ -1252,7 +1314,11 @@ function CategoryPage({ category, onOpenProduct, wishlist, toggleWish, query, on
         ? <p className="text-sm" style={{ color: C.inkSoft }}>No products match your search.</p>
         : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-6">
-            {products.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} />))}
+            {products.map((p, i) => (
+              <Reveal key={p.id} dir="up" distance={35} delay={i * 40}>
+                <TiltCard product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} />
+              </Reveal>
+            ))}
           </div>
         )
       }
@@ -1285,90 +1351,98 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
         {/* Back */}
         <BackButton onBack={onBack} />
 
-        {/* ── Image ── */}
-        <div className="aspect-square rounded-2xl overflow-hidden shadow-xl mt-3 sm:mt-4">
-          <ProductVisual size="hero" />
-        </div>
-
-        {/* ── Title + price ── */}
-        <div className="mt-4 mb-6 sm:mt-5 sm:mb-8">
-          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.inkSoft, opacity: 0.6, marginBottom: 4 }}>{product.category}</p>
-          <div className="flex items-start justify-between gap-3">
-            <h1 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "clamp(1.6rem,5vw,3rem)", lineHeight: 1.05, margin: 0 }}>{product.name}</h1>
-            <p style={{ color: C.ink, fontSize: "1.2rem", fontWeight: 600, whiteSpace: "nowrap", paddingTop: 4 }}>{fmt(product.price)}</p>
+        {/* ── Image — slides down from above ── */}
+        <Reveal dir="down" distance={50} style={{ marginTop: "0.75rem" }}>
+          <div className="aspect-square rounded-2xl overflow-hidden shadow-xl">
+            <ProductVisual size="hero" />
           </div>
-          {/* Rating */}
-          <div className="flex items-center gap-2 mt-2">
-            <div className="flex">{Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={13} fill={i < Math.round(product.rating) ? "#d9a02e" : "none"} stroke="#d9a02e" />))}</div>
-            <span className="text-xs" style={{ color: C.inkSoft }}>{product.rating} ({product.reviews})</span>
+        </Reveal>
+
+        {/* ── Title + price — fades up ── */}
+        <Reveal dir="up" distance={30} delay={60}>
+          <div className="mt-4 mb-6 sm:mt-5 sm:mb-8">
+            <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: C.inkSoft, opacity: 0.6, marginBottom: 4 }}>{product.category}</p>
+            <div className="flex items-start justify-between gap-3">
+              <h1 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "clamp(1.6rem,5vw,3rem)", lineHeight: 1.05, margin: 0 }}>{product.name}</h1>
+              <p style={{ color: C.ink, fontSize: "1.2rem", fontWeight: 600, whiteSpace: "nowrap", paddingTop: 4 }}>{fmt(product.price)}</p>
+            </div>
+            <div className="flex items-center gap-2 mt-2">
+              <div className="flex">{Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={13} fill={i < Math.round(product.rating) ? "#d9a02e" : "none"} stroke="#d9a02e" />))}</div>
+              <span className="text-xs" style={{ color: C.inkSoft }}>{product.rating} ({product.reviews})</span>
+            </div>
+            <p className="text-sm leading-relaxed mt-3" style={{ color: C.inkSoft }}>{product.desc}</p>
           </div>
-          <p className="text-sm leading-relaxed mt-3" style={{ color: C.inkSoft }}>{product.desc}</p>
-        </div>
+        </Reveal>
 
-        {/* ── Coming Soon card (with reviews floating inside) ── */}
-        <div className="rounded-2xl p-6 mb-8" style={{ background: "radial-gradient(ellipse at 30% 0%, #3A2015 0%, #1E0D06 100%)", border: "1px solid rgba(200,168,130,0.14)" }}>
-          <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(200,168,130,0.5)", marginBottom: 6 }}>Availability</p>
-          <p style={{ fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "1.4rem", color: "#C8A882", marginBottom: 8 }}>Coming Soon</p>
-          <p style={{ fontSize: "0.78rem", color: "rgba(200,168,130,0.55)", lineHeight: 1.6, marginBottom: 16 }}>
-            This piece is part of an upcoming drop. Be the first to know when it lands.
-          </p>
-
-          {/* Floating review cards inside the dark box */}
-          <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", marginBottom: 16 }}>
-            {REVIEWS.map((r) => (
-              <div key={r.name} style={{
-                flexShrink: 0, width: 200, borderRadius: "1rem", padding: "0.9rem 1rem",
-                background: "rgba(200,168,130,0.07)", border: "1px solid rgba(200,168,130,0.13)",
-              }}>
-                <div style={{ display: "flex", gap: 2, marginBottom: 8 }}>
-                  {Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={11} fill={i < r.stars ? "#d9a02e" : "none"} stroke="#d9a02e" />))}
+        {/* ── Coming Soon card — fades up ── */}
+        <Reveal dir="up" distance={30} delay={80}>
+          <div className="rounded-2xl p-6 mb-8" style={{ background: "radial-gradient(ellipse at 30% 0%, #3A2015 0%, #1E0D06 100%)", border: "1px solid rgba(200,168,130,0.14)" }}>
+            <p style={{ fontSize: 10, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(200,168,130,0.5)", marginBottom: 6 }}>Availability</p>
+            <p style={{ fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "1.4rem", color: "#C8A882", marginBottom: 8 }}>Coming Soon</p>
+            <p style={{ fontSize: "0.78rem", color: "rgba(200,168,130,0.55)", lineHeight: 1.6, marginBottom: 16 }}>
+              This piece is part of an upcoming drop. Be the first to know when it lands.
+            </p>
+            <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", marginBottom: 16 }}>
+              {REVIEWS.map((r) => (
+                <div key={r.name} style={{
+                  flexShrink: 0, width: 200, borderRadius: "1rem", padding: "0.9rem 1rem",
+                  background: "rgba(200,168,130,0.07)", border: "1px solid rgba(200,168,130,0.13)",
+                }}>
+                  <div style={{ display: "flex", gap: 2, marginBottom: 8 }}>
+                    {Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={11} fill={i < r.stars ? "#d9a02e" : "none"} stroke="#d9a02e" />))}
+                  </div>
+                  <p style={{ fontSize: "0.75rem", color: "rgba(200,168,130,0.7)", lineHeight: 1.55, marginBottom: 8 }}>{r.text}</p>
+                  <p style={{ fontSize: "0.7rem", color: "rgba(200,168,130,0.4)" }}>{r.name}</p>
                 </div>
-                <p style={{ fontSize: "0.75rem", color: "rgba(200,168,130,0.7)", lineHeight: 1.55, marginBottom: 8 }}>{r.text}</p>
-                <p style={{ fontSize: "0.7rem", color: "rgba(200,168,130,0.4)" }}>{r.name}</p>
-              </div>
-            ))}
+              ))}
+            </div>
+            <button
+              onClick={() => setNotified(true)}
+              className="w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
+              style={notified
+                ? { background: "rgba(200,168,130,0.12)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.25)" }
+                : { background: "#C8A882", color: "#1E0D06" }
+              }
+            >
+              {notified ? (<><Check size={15} /> You're on the list</>) : "Notify Me When Available"}
+            </button>
+            <button
+              onClick={() => toggleWish(product.id)}
+              className="mt-3 w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
+              style={{ background: "rgba(200,168,130,0.07)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.15)" }}
+            >
+              <Heart size={14} fill={wishlist.has(product.id) ? "#C8A882" : "none"} stroke="#C8A882" />
+              {wishlist.has(product.id) ? "Saved to Wishlist" : "Save to Wishlist"}
+            </button>
           </div>
+        </Reveal>
 
-          {/* Notify button */}
-          <button
-            onClick={() => setNotified(true)}
-            className="w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
-            style={notified
-              ? { background: "rgba(200,168,130,0.12)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.25)" }
-              : { background: "#C8A882", color: "#1E0D06" }
-            }
-          >
-            {notified ? (<><Check size={15} /> You're on the list</>) : "Notify Me When Available"}
-          </button>
-
-          {/* Wishlist */}
-          <button
-            onClick={() => toggleWish(product.id)}
-            className="mt-3 w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
-            style={{ background: "rgba(200,168,130,0.07)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.15)" }}
-          >
-            <Heart size={14} fill={wishlist.has(product.id) ? "#C8A882" : "none"} stroke="#C8A882" />
-            {wishlist.has(product.id) ? "Saved to Wishlist" : "Save to Wishlist"}
-          </button>
-        </div>
-
-        {/* Perks */}
-        <div className="grid grid-cols-3 gap-3 text-xs mb-8" style={{ color: C.inkSoft }}>
-          <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><Truck size={14} /><span>Free Shipping</span></div>
-          <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><RotateCcw size={14} /><span>30-Day Returns</span></div>
-          <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><ShieldCheck size={14} /><span>Secure Checkout</span></div>
-        </div>
+        {/* ── Perks — fade up ── */}
+        <Reveal dir="up" distance={25} delay={60}>
+          <div className="grid grid-cols-3 gap-3 text-xs mb-8" style={{ color: C.inkSoft }}>
+            <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><Truck size={14} /><span>Free Shipping</span></div>
+            <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><RotateCcw size={14} /><span>30-Day Returns</span></div>
+            <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><ShieldCheck size={14} /><span>Secure Checkout</span></div>
+          </div>
+        </Reveal>
       </div>
 
-      {/* ── You may also like — with fade into footer ── */}
+      {/* ── You may also like — cards slide in from sides ── */}
       {related.length > 0 && (
         <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
           <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
-            <div className="mb-8">
-              <h2 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "2.25rem", margin: 0 }}>You may also like</h2>
-            </div>
+            <Reveal dir="up" distance={30}>
+              <h2 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "2.25rem", margin: "0 0 2rem 0" }}>You may also like</h2>
+            </Reveal>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-              {related.map((p) => (<TiltCard key={p.id} product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />))}
+              {related.map((p, i) => {
+                const dir = i < related.length / 2 ? "left" : "right";
+                return (
+                  <Reveal key={p.id} dir={dir} distance={60} delay={i * 60}>
+                    <TiltCard product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />
+                  </Reveal>
+                );
+              })}
             </div>
           </div>
         </section>
