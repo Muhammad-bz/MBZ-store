@@ -1348,16 +1348,27 @@ const SLIDES = [
 function CarouselSlide({ label, sub, size = "main", floating = false }) {
   const floatStyle = floating ? {
     animation: `floatCard 3.5s ease-in-out infinite`,
-    animationDelay: size === "prev" ? "0s" : "1.2s",
+    animationDelay: "1.2s",
   } : {};
 
   return (
     <div style={{
-      position: "relative", width: "100%", height: "100%",
-      borderRadius: "1.25rem", overflow: "hidden",
+      width: "100%", height: "100%",
+      position: "relative",
+      borderRadius: "inherit", overflow: "hidden",
       background: "radial-gradient(ellipse at 30% 25%, #5C3D2A 0%, #3A2015 40%, #1E0E07 100%)",
       ...floatStyle,
     }}>
+      <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E\")" }} />
+      <div style={{ position: "absolute", top: "-20%", left: "-10%", width: "55%", height: "55%", borderRadius: "50%", background: "radial-gradient(circle, rgba(200,140,70,0.2) 0%, transparent 70%)" }} />
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 35%, rgba(10,4,2,0.6) 100%)" }} />
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, zIndex: 2 }}>
+        <p style={{ fontFamily: FONT_ACCENT, fontStyle: "italic", color: "#C8A882", fontSize: size === "main" ? "1.6rem" : "1rem", letterSpacing: "0.04em", margin: 0 }}>{label}</p>
+        <p style={{ fontSize: size === "main" ? 11 : 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(200,168,130,0.45)", margin: 0 }}>{sub}</p>
+      </div>
+    </div>
+  );
+}
       {/* noise */}
       <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E\")" }} />
       {/* warm glow */}
@@ -1380,6 +1391,7 @@ function ProductCarousel({ zoomed, setZoomed }) {
   const [hovered, setHovered] = useState(false);
   const [drag, setDrag]       = useState(null);
   const [zDrag, setZDrag]     = useState(null);
+  const dragRef               = useRef(null);
   const total = SLIDES.length;
 
   const go = (idx) => {
@@ -1469,67 +1481,78 @@ function ProductCarousel({ zoomed, setZoomed }) {
         @keyframes zBgIn    { from { opacity:0; } to { opacity:1; } }
       `}</style>
 
-      {/* ── Zoom modal — fixed overlay, z-index above everything ── */}
+      {/* ── Zoom modal ── */}
       {zoomed && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 200,
-          display: "flex", flexDirection: "column",
-          alignItems: "center", justifyContent: "center",
-          background: "rgba(10,4,2,0.45)",
-          backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
-          animation: "zBgIn 0.25s ease",
-        }}
-          onClick={(e) => { e.stopPropagation(); setZoomed(false); }}
-          onTouchStart={onZTouchStart} onTouchMove={onZTouchMove} onTouchEnd={onZTouchEnd}
-        >
+        <>
+          {/* Backdrop: separate element, no children, just blur overlay */}
+          <div
+            onClick={() => setZoomed(false)}
+            style={{
+              position: "fixed", inset: 0, zIndex: 200,
+              background: "rgba(10,4,2,0.5)",
+              backdropFilter: "blur(14px)",
+              WebkitBackdropFilter: "blur(14px)",
+              animation: "zBgIn 0.25s ease",
+            }}
+          />
 
-          {/* Close */}
-          <button onClick={() => setZoomed(false)} style={{
-            position: "absolute", top: 20, right: 20, zIndex: 5,
-            width: 36, height: 36, borderRadius: "50%",
-            background: "rgba(200,168,130,0.10)", border: "1px solid rgba(200,168,130,0.22)",
-            color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-          }}><X size={15} /></button>
+          {/* Content: sibling div, NO filter/backdrop, renders sharp above blur */}
+          <div
+            style={{
+              position: "fixed", inset: 0, zIndex: 201,
+              display: "flex", flexDirection: "column",
+              alignItems: "center", justifyContent: "center",
+              gap: 0,
+            }}
+          >
+            {/* Close */}
+            <button
+              onClick={() => setZoomed(false)}
+              style={{
+                position: "absolute", top: 20, right: 20,
+                width: 36, height: 36, borderRadius: "50%",
+                background: "rgba(200,168,130,0.10)", border: "1px solid rgba(200,168,130,0.22)",
+                color: "#C8A882", display: "flex", alignItems: "center",
+                justifyContent: "center", cursor: "pointer",
+              }}
+            ><X size={15} /></button>
 
-          {/* Image + side arrows */}
-          <div onClick={(e) => e.stopPropagation()} style={{
-            display: "flex", alignItems: "center", gap: 20, padding: "0 1.5rem",
-          }}>
-            <ArrowBtn dir="prev" onClick={() => go(active - 1)} />
+            {/* Arrows + image */}
+            <div
+              onTouchStart={onZTouchStart} onTouchMove={onZTouchMove} onTouchEnd={onZTouchEnd}
+              style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 12px", width: "100%" }}
+            >
+              <ArrowBtn dir="prev" onClick={() => go(active - 1)} />
 
-            <div style={{
-              width: "min(80vw, 460px)", height: "min(80vw, 460px)",
-              borderRadius: "2rem", overflow: "hidden",
-              boxShadow: "0 32px 80px rgba(5,2,1,0.6)",
-              border: "1px solid rgba(200,140,60,0.15)",
-              animation: "zoomIn 0.32s cubic-bezier(0.22,1,0.36,1)",
-              position: "relative", flexShrink: 0,
-            }}>
-              <div key={`z-${active}`} style={{ position: "absolute", inset: 0, animation: fading ? "slideIn 0.4s ease forwards" : "none" }}>
+              <div style={{
+                flex: 1,
+                aspectRatio: "1 / 1",
+                borderRadius: "2rem",
+                overflow: "hidden",
+                boxShadow: "0 24px 60px rgba(5,2,1,0.7)",
+                border: "1px solid rgba(200,140,60,0.18)",
+                animation: "zoomIn 0.32s cubic-bezier(0.22,1,0.36,1)",
+                position: "relative",
+              }}>
                 <CarouselSlide {...SLIDES[active]} size="main" />
               </div>
-              {prev2 !== null && (
-                <div key={`zo-${prev2}`} style={{ position: "absolute", inset: 0, animation: "slideOut 0.35s ease forwards" }}>
-                  <CarouselSlide {...SLIDES[prev2]} size="main" />
-                </div>
-              )}
+
+              <ArrowBtn dir="next" onClick={() => go(active + 1)} />
             </div>
 
-            <ArrowBtn dir="next" onClick={() => go(active + 1)} />
+            {/* Dots */}
+            <div style={{ display: "flex", gap: 6, marginTop: 20 }}>
+              {SLIDES.map((_, i) => (
+                <button key={i} onClick={() => go(i)} style={{
+                  width: i === active ? 20 : 6, height: 6, borderRadius: 3,
+                  background: i === active ? "#C8A882" : "rgba(200,168,130,0.3)",
+                  border: "none", padding: 0, cursor: "pointer",
+                  transition: "width 0.3s ease, background 0.3s ease",
+                }} />
+              ))}
+            </div>
           </div>
-
-          {/* Dots */}
-          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", gap: 6, marginTop: 20 }}>
-            {SLIDES.map((_, i) => (
-              <button key={i} onClick={() => go(i)} style={{
-                width: i === active ? 20 : 6, height: 6, borderRadius: 3,
-                background: i === active ? "#C8A882" : "rgba(200,168,130,0.3)",
-                border: "none", padding: 0, cursor: "pointer",
-                transition: "width 0.3s ease, background 0.3s ease",
-              }} />
-            ))}
-          </div>
-        </div>
+        </>
       )}
 
       {/* ── Main carousel ── */}
