@@ -33,62 +33,62 @@ function GlobalFonts() {
 }
 
 /* ══════════════════════════════════════════════════════════
-   SCROLL REVEAL HOOK
-   ── Watches an element's position; calls back with a 0→1
-      progress value so callers can drive opacity + translate.
-   ── Reverses on scroll-up (progress goes back down).
-   ── Single IntersectionObserver + passive scroll listener
-      per instance — cheap on mobile.
+   SCROLL REVEAL — DOM-direct, zero React re-renders
+   ── One shared rAF loop for ALL reveal elements.
+   ── Writes opacity + transform directly to DOM.
+   ── Reverses on scroll-up.
 ══════════════════════════════════════════════════════════ */
-function useScrollReveal(ref, { offset = 0.15, speed = 0.65 } = {}) {
-  const [p, setP] = useState(0);
+const revealRegistry = new Set();
+let revealRafId = null;
+
+function tickReveal() {
+  revealRafId = null;
+  const vh = window.innerHeight;
+  for (const entry of revealRegistry) {
+    const { el, dir, distance, speed } = entry;
+    if (!el) continue;
+    const { top, height } = el.getBoundingClientRect();
+    const raw  = (vh - top) / (vh * speed + height * 0.15);
+    const p    = Math.min(1, Math.max(0, raw));
+    const ease = 1 - Math.pow(1 - p, 3);
+    const tx = dir === "left"  ?  (1 - ease) * distance
+             : dir === "right" ? -(1 - ease) * distance : 0;
+    const ty = dir === "up"   ?  (1 - ease) * distance
+             : dir === "down" ? -(1 - ease) * distance  : 0;
+    el.style.opacity   = ease;
+    el.style.transform = `translate(${tx}px,${ty}px)`;
+  }
+}
+
+function scheduleReveal() {
+  if (!revealRafId) revealRafId = requestAnimationFrame(tickReveal);
+}
+
+if (typeof window !== "undefined") {
+  window.addEventListener("scroll", scheduleReveal, { passive: true });
+  window.addEventListener("resize", scheduleReveal, { passive: true });
+}
+
+function Reveal({ children, dir = "up", distance = 40, delay = 0, style: extraStyle }) {
+  const ref = useRef(null);
+
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
-    const calc = () => {
-      const { top, height } = el.getBoundingClientRect();
-      const vh = window.innerHeight;
-      const raw = (vh - top) / (vh * speed + height * offset);
-      setP(Math.min(1, Math.max(0, raw)));
-    };
-    calc();
-    window.addEventListener("scroll", calc, { passive: true });
-    window.addEventListener("resize", calc, { passive: true });
-    return () => {
-      window.removeEventListener("scroll", calc);
-      window.removeEventListener("resize", calc);
-    };
+    // Start invisible
+    el.style.opacity   = "0";
+    el.style.transform = `translate(${dir === "left" ? distance : dir === "right" ? -distance : 0}px,${dir === "up" ? distance : dir === "down" ? -distance : 0}px)`;
+    el.style.transition = `opacity 0.55s ease ${delay}ms, transform 0.55s ease ${delay}ms`;
+    el.style.willChange = "opacity, transform";
+
+    const entry = { el, dir, distance, speed: 0.65 };
+    revealRegistry.add(entry);
+    scheduleReveal();
+    return () => revealRegistry.delete(entry);
   }, []);
-  return p;
-}
-
-/* Wrap a child with a reveal animation driven by scroll progress.
-   dir: "up" | "down" | "left" | "right"
-   distance: px to travel
-   delay: ms stagger offset (CSS transition-delay) */
-function Reveal({ children, dir = "up", distance = 40, delay = 0, style: extraStyle }) {
-  const ref  = useRef(null);
-  const p    = useScrollReveal(ref);
-  const ease = 1 - Math.pow(1 - p, 3); // cubic ease-out
-
-  const tx = dir === "left"  ? `${(1 - ease) *  distance}px`
-           : dir === "right" ? `${(1 - ease) * -distance}px`
-           : "0px";
-  const ty = dir === "up"   ? `${(1 - ease) *  distance}px`
-           : dir === "down" ? `${(1 - ease) * -distance}px`
-           : "0px";
 
   return (
-    <div
-      ref={ref}
-      style={{
-        opacity: ease,
-        transform: `translate(${tx}, ${ty})`,
-        transition: `opacity 0.55s ease ${delay}ms, transform 0.55s ease ${delay}ms`,
-        willChange: "opacity, transform",
-        ...extraStyle,
-      }}
-    >
+    <div ref={ref} style={{ opacity: 0, ...extraStyle }}>
       {children}
     </div>
   );
@@ -655,9 +655,19 @@ function Navbar({ cartCount, wishlist, onNav, onCart, onWishlist, query, setQuer
       <header className="sticky top-0 z-40" style={{
         background: "radial-gradient(ellipse at 20% 0%, #4A2A14 0%, #2E1508 55%, #1E0D06 100%)",
         boxShadow: "0 1px 0 rgba(200,140,60,0.10), 0 4px 24px rgba(10,4,2,0.35)",
+        transform: "translateZ(0)",
+        willChange: "transform",
       }}>
         <div className="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
-          <button onClick={() => onNav("home")} className="text-xl font-bold tracking-[0.2em]" style={{ color: "#C8A882", fontFamily: FONT_ACCENT, fontStyle: "italic" }}>MBZ</button>
+          {/* MBZ — fixed width so it never shifts */}
+          <button
+            onClick={() => onNav("home")}
+            style={{
+              color: "#C8A882", fontFamily: FONT_ACCENT, fontStyle: "italic",
+              fontSize: "1.35rem", fontWeight: 700, letterSpacing: "0.2em",
+              flexShrink: 0, minWidth: 60,
+            }}
+          >MBZ</button>
 
           <nav className="hidden md:flex items-center gap-8 text-sm" style={{ color: "rgba(200,168,130,0.7)" }}>
             {Object.entries(CATEGORY_META).map(([key, meta]) => (
@@ -665,33 +675,26 @@ function Navbar({ cartCount, wishlist, onNav, onCart, onWishlist, query, setQuer
             ))}
           </nav>
 
-          <div className="flex items-center gap-1">
-            {/* Search */}
+          <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
             <button onClick={() => setPanel(p => p === "search" ? null : "search")}
-              className="w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
-              <Search size={18} />
+              className="w-10 h-10 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
+              <Search size={22} />
             </button>
-
-            {/* Wishlist */}
-            <button onClick={onWishlist} className="relative w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
-              <Heart size={18} />
+            <button onClick={onWishlist} className="relative w-10 h-10 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
+              <Heart size={22} />
               {wishlist.size > 0 && (
-                <span className="absolute -top-1 -right-1 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#C8A882", color: "#1E0D06" }}>{wishlist.size}</span>
+                <span className="absolute -top-0.5 -right-0.5 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#C8A882", color: "#1E0D06" }}>{wishlist.size}</span>
               )}
             </button>
-
-            {/* Cart */}
-            <button onClick={onCart} className="relative w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
-              <ShoppingBag size={18} />
+            <button onClick={onCart} className="relative w-10 h-10 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
+              <ShoppingBag size={22} />
               {cartCount > 0 && (
-                <span className="absolute -top-1 -right-1 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#C8A882", color: "#1E0D06" }}>{cartCount}</span>
+                <span className="absolute -top-0.5 -right-0.5 text-[10px] font-bold min-w-[18px] h-[18px] rounded-full flex items-center justify-center" style={{ background: "#C8A882", color: "#1E0D06" }}>{cartCount}</span>
               )}
             </button>
-
-            {/* Menu (mobile) */}
             <button onClick={() => setPanel(p => p === "menu" ? null : "menu")}
-              className="md:hidden w-9 h-9 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
-              <Menu size={18} />
+              className="md:hidden w-10 h-10 rounded-full flex items-center justify-center" style={{ color: "#C8A882" }}>
+              <Menu size={22} />
             </button>
           </div>
         </div>
@@ -1329,11 +1332,282 @@ function CategoryPage({ category, onOpenProduct, wishlist, toggleWish, query, on
 /* ══════════════════════════════════════════════════════════
    PRODUCT PAGE
 ══════════════════════════════════════════════════════════ */
+/* ══════════════════════════════════════════════════════════
+   PRODUCT CAROUSEL
+   ── 3 slides: prev (left, faded, floating), current (center,
+      full), next (right, faded, floating).
+   ── Swipe on mobile, arrow keys + click on desktop.
+   ── Side cards animate with a gentle float loop.
+══════════════════════════════════════════════════════════ */
+const SLIDES = [
+  { label: "Coming Soon",   sub: "Drop 01" },
+  { label: "Stay Tuned",    sub: "Drop 02" },
+  { label: "Coming Soon",   sub: "Drop 03" },
+];
+
+function CarouselSlide({ label, sub, size = "main", floating = false }) {
+  const floatStyle = floating ? {
+    animation: `floatCard 3.5s ease-in-out infinite`,
+    animationDelay: size === "prev" ? "0s" : "1.2s",
+  } : {};
+
+  return (
+    <div style={{
+      position: "relative", width: "100%", height: "100%",
+      borderRadius: "1.25rem", overflow: "hidden",
+      background: "radial-gradient(ellipse at 30% 25%, #5C3D2A 0%, #3A2015 40%, #1E0E07 100%)",
+      ...floatStyle,
+    }}>
+      {/* noise */}
+      <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E\")" }} />
+      {/* warm glow */}
+      <div style={{ position: "absolute", top: "-20%", left: "-10%", width: "55%", height: "55%", borderRadius: "50%", background: "radial-gradient(circle, rgba(200,140,70,0.2) 0%, transparent 70%)" }} />
+      {/* vignette */}
+      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 35%, rgba(10,4,2,0.6) 100%)" }} />
+      {/* text */}
+      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, zIndex: 2 }}>
+        <p style={{ fontFamily: FONT_ACCENT, fontStyle: "italic", color: "#C8A882", fontSize: size === "main" ? "1.6rem" : "1rem", letterSpacing: "0.04em", margin: 0 }}>{label}</p>
+        <p style={{ fontSize: size === "main" ? 11 : 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(200,168,130,0.45)", margin: 0 }}>{sub}</p>
+      </div>
+    </div>
+  );
+}
+
+function ProductCarousel({ zoomed, setZoomed }) {
+  const [active, setActive]   = useState(0);
+  const [prev2,  setPrev2]    = useState(null);
+  const [fading, setFading]   = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [drag, setDrag]       = useState(null);
+  const [zDrag, setZDrag]     = useState(null);
+  const total = SLIDES.length;
+
+  const go = (idx) => {
+    const next = (idx + total) % total;
+    if (next === active) return;
+    setPrev2(active); setFading(true); setActive(next);
+    setTimeout(() => { setPrev2(null); setFading(false); }, 420);
+  };
+
+  // Lock / unlock body scroll when zoomed
+  useEffect(() => {
+    document.body.style.overflow = zoomed ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [zoomed]);
+
+  // Escape key closes zoom
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") setZoomed(false); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
+
+  // Scroll wheel inside zoom → change slide
+  useEffect(() => {
+    if (!zoomed) return;
+    const h = (e) => { e.preventDefault(); go(active + (e.deltaX > 0 || e.deltaY > 0 ? 1 : -1)); };
+    window.addEventListener("wheel", h, { passive: false });
+    return () => window.removeEventListener("wheel", h);
+  }, [zoomed, active]);
+
+  // Swipe on main carousel
+  const onTouchStart = (e) => { dragRef.current = { startX: e.touches[0].clientX, moved: 0 }; setDrag(dragRef.current); };
+  const onTouchMove  = (e) => {
+    if (!dragRef.current) return;
+    const moved = e.touches[0].clientX - dragRef.current.startX;
+    dragRef.current.moved = moved;
+    setDrag({ ...dragRef.current });
+  };
+  const onTouchEnd = (e) => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    setDrag(null);
+    if (!d) return;
+    if (Math.abs(d.moved) > 40) {
+      go(d.moved < 0 ? active + 1 : active - 1);
+    } else if (Math.abs(d.moved) < 8) {
+      e.preventDefault(); // prevent synthetic click from firing after touch
+      setZoomed(true);
+    }
+  };
+
+  // Swipe inside zoom modal
+  const onZTouchStart = (e) => setZDrag({ startX: e.touches[0].clientX, moved: 0 });
+  const onZTouchMove  = (e) => { if (zDrag) setZDrag(d => ({ ...d, moved: e.touches[0].clientX - d.startX })); };
+  const onZTouchEnd   = () => {
+    if (Math.abs(zDrag?.moved ?? 0) > 40) go(zDrag.moved < 0 ? active + 1 : active - 1);
+    setZDrag(null);
+  };
+
+  const prevIdx   = (active - 1 + total) % total;
+  const nextIdx   = (active + 1) % total;
+  const mainScale = hovered ? 1.04 : 1;
+
+  const ArrowBtn = ({ dir, onClick, style: s }) => (
+    <button onClick={onClick} style={{
+      width: 36, height: 36, borderRadius: "50%", border: "none", cursor: "pointer",
+      background: "rgba(200,168,130,0.15)", backdropFilter: "blur(6px)",
+      WebkitBackdropFilter: "blur(6px)",
+      color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center",
+      fontSize: 18, fontWeight: 300, lineHeight: 1,
+      transition: "background 0.2s ease, transform 0.2s ease",
+      flexShrink: 0,
+      ...s,
+    }}>{dir === "prev" ? "‹" : "›"}</button>
+  );
+
+  return (
+    <>
+      <style>{`
+        @keyframes floatCard {
+          0%, 100% { transform: translateY(0px) rotate(-1deg); }
+          50%       { transform: translateY(-10px) rotate(1deg); }
+        }
+        @keyframes slideIn  { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
+        @keyframes slideOut { from { opacity:1; } to { opacity:0; } }
+        @keyframes zoomIn   { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
+        @keyframes zBgIn    { from { opacity:0; } to { opacity:1; } }
+      `}</style>
+
+      {/* ── Zoom modal — fixed overlay, z-index above everything ── */}
+      {zoomed && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 200,
+          display: "flex", flexDirection: "column",
+          alignItems: "center", justifyContent: "center",
+          background: "rgba(10,4,2,0.45)",
+          backdropFilter: "blur(6px)", WebkitBackdropFilter: "blur(6px)",
+          animation: "zBgIn 0.25s ease",
+        }}
+          onClick={(e) => { e.stopPropagation(); setZoomed(false); }}
+          onTouchStart={onZTouchStart} onTouchMove={onZTouchMove} onTouchEnd={onZTouchEnd}
+        >
+
+          {/* Close */}
+          <button onClick={() => setZoomed(false)} style={{
+            position: "absolute", top: 20, right: 20, zIndex: 5,
+            width: 36, height: 36, borderRadius: "50%",
+            background: "rgba(200,168,130,0.10)", border: "1px solid rgba(200,168,130,0.22)",
+            color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+          }}><X size={15} /></button>
+
+          {/* Image + side arrows */}
+          <div onClick={(e) => e.stopPropagation()} style={{
+            display: "flex", alignItems: "center", gap: 20, padding: "0 1.5rem",
+          }}>
+            <ArrowBtn dir="prev" onClick={() => go(active - 1)} />
+
+            <div style={{
+              width: "min(80vw, 460px)", height: "min(80vw, 460px)",
+              borderRadius: "2rem", overflow: "hidden",
+              boxShadow: "0 32px 80px rgba(5,2,1,0.6)",
+              border: "1px solid rgba(200,140,60,0.15)",
+              animation: "zoomIn 0.32s cubic-bezier(0.22,1,0.36,1)",
+              position: "relative", flexShrink: 0,
+            }}>
+              <div key={`z-${active}`} style={{ position: "absolute", inset: 0, animation: fading ? "slideIn 0.4s ease forwards" : "none" }}>
+                <CarouselSlide {...SLIDES[active]} size="main" />
+              </div>
+              {prev2 !== null && (
+                <div key={`zo-${prev2}`} style={{ position: "absolute", inset: 0, animation: "slideOut 0.35s ease forwards" }}>
+                  <CarouselSlide {...SLIDES[prev2]} size="main" />
+                </div>
+              )}
+            </div>
+
+            <ArrowBtn dir="next" onClick={() => go(active + 1)} />
+          </div>
+
+          {/* Dots */}
+          <div onClick={(e) => e.stopPropagation()} style={{ display: "flex", gap: 6, marginTop: 20 }}>
+            {SLIDES.map((_, i) => (
+              <button key={i} onClick={() => go(i)} style={{
+                width: i === active ? 20 : 6, height: 6, borderRadius: 3,
+                background: i === active ? "#C8A882" : "rgba(200,168,130,0.3)",
+                border: "none", padding: 0, cursor: "pointer",
+                transition: "width 0.3s ease, background 0.3s ease",
+              }} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Main carousel ── */}
+      <div style={{ position: "relative", width: "100%", userSelect: "none" }}
+        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+      >
+        <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", height: "clamp(260px, 55vw, 460px)" }}>
+
+          {/* Prev side card */}
+          <div onClick={() => go(active - 1)} style={{
+            position: "absolute", left: "clamp(-10px, -2vw, 0px)",
+            width: "clamp(110px, 26vw, 200px)", height: "clamp(110px, 26vw, 200px)",
+            opacity: 0.4, cursor: "pointer", filter: "blur(1.5px)", zIndex: 1,
+          }}>
+            <CarouselSlide {...SLIDES[prevIdx]} size="side" floating />
+          </div>
+
+          {/* Main card */}
+          <div
+            onMouseEnter={() => setHovered(true)}
+            onMouseLeave={() => setHovered(false)}
+            onClick={() => setZoomed(true)}
+            style={{
+              position: "relative", cursor: "zoom-in",
+              width: "clamp(220px, 52vw, 400px)", height: "clamp(220px, 52vw, 400px)",
+              zIndex: 2,
+              boxShadow: "0 24px 60px rgba(5,2,1,0.55)",
+              borderRadius: "1.25rem", overflow: "hidden",
+              transform: `scale(${mainScale})`,
+              transition: "transform 0.35s cubic-bezier(0.34,1.56,0.64,1)",
+            }}
+          >
+            <div key={active} style={{ position: "absolute", inset: 0, animation: fading ? "slideIn 0.4s ease forwards" : "none", borderRadius: "1.25rem", overflow: "hidden" }}>
+              <CarouselSlide {...SLIDES[active]} size="main" />
+            </div>
+            {prev2 !== null && (
+              <div key={`out-${prev2}`} style={{ position: "absolute", inset: 0, animation: "slideOut 0.35s ease forwards", borderRadius: "1.25rem", overflow: "hidden" }}>
+                <CarouselSlide {...SLIDES[prev2]} size="main" />
+              </div>
+            )}
+          </div>
+
+          {/* Next side card */}
+          <div onClick={() => go(active + 1)} style={{
+            position: "absolute", right: "clamp(-10px, -2vw, 0px)",
+            width: "clamp(110px, 26vw, 200px)", height: "clamp(110px, 26vw, 200px)",
+            opacity: 0.4, cursor: "pointer", filter: "blur(1.5px)", zIndex: 1,
+          }}>
+            <CarouselSlide {...SLIDES[nextIdx]} size="side" floating />
+          </div>
+        </div>
+
+        {/* Arrow buttons + dots row */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
+          <ArrowBtn dir="prev" onClick={() => go(active - 1)} />
+          <div style={{ display: "flex", gap: 6 }}>
+            {SLIDES.map((_, i) => (
+              <button key={i} onClick={() => go(i)} style={{
+                width: i === active ? 20 : 6, height: 6, borderRadius: 3,
+                background: i === active ? "#C8A882" : "rgba(200,168,130,0.3)",
+                border: "none", padding: 0, cursor: "pointer",
+                transition: "width 0.3s ease, background 0.3s ease",
+              }} />
+            ))}
+          </div>
+          <ArrowBtn dir="next" onClick={() => go(active + 1)} />
+        </div>
+      </div>
+    </>
+  );
+}
+
 function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProduct, onBack }) {
   const product = PRODUCTS.find((p) => p.id === productId);
   const [notified, setNotified] = useState(false);
+  const [zoomed, setZoomed]     = useState(false);
 
-  useEffect(() => { setNotified(false); }, [productId]);
+  useEffect(() => { setNotified(false); setZoomed(false); }, [productId]);
   if (!product) return null;
 
   const related = PRODUCTS.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
@@ -1351,12 +1625,10 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
         {/* Back */}
         <BackButton onBack={onBack} />
 
-        {/* ── Image — slides down from above ── */}
-        <Reveal dir="down" distance={50} style={{ marginTop: "0.75rem" }}>
-          <div className="aspect-square rounded-2xl overflow-hidden shadow-xl">
-            <ProductVisual size="hero" />
-          </div>
-        </Reveal>
+        {/* ── Image Carousel — no Reveal wrapper so fixed modal isn't trapped ── */}
+        <div style={{ marginTop: "0.75rem" }}>
+          <ProductCarousel zoomed={zoomed} setZoomed={setZoomed} />
+        </div>
 
         {/* ── Title + price — fades up ── */}
         <Reveal dir="up" distance={30} delay={60}>
@@ -1890,7 +2162,7 @@ export default function App() {
       `}</style>
       <Navbar cartCount={cartCount} wishlist={wishlist} onNav={handleNav} onCart={() => setCartOpen(true)} onWishlist={() => setWishlistOpen(true)} query={query} setQuery={setQuery} />
 
-      <div key={fadeKey} className="page-fade">
+      <div key={fadeKey} className="page-fade" style={{ contain: "paint" }}>
         {view === "home"     && <HomePage     onNav={handleNav} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} />}
         {view === "category" && <CategoryPage category={category} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} query={query} onBack={handleBack} />}
         {view === "product"  && <ProductPage  productId={productId} onAddToCart={addToCart} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={openProduct} onBack={handleBack} />}
