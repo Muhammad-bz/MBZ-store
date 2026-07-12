@@ -1412,9 +1412,23 @@ function ProductCarousel({ onZoom }) {
 
   useEffect(() => { onZoom && onZoom("sync", active, goManual); }, [active]);
 
+  const trackRef = useRef(null);
+  useEffect(() => {
+    const el = trackRef.current;
+    if (!el) return;
+    const handler = (e) => {
+      // Only prevent horizontal swipes — let vertical scrolling through
+      if (touchStartRef.current && Math.abs(touchStartRef.current.moved) > Math.abs(touchStartRef.current.movedY || 0)) {
+        e.preventDefault();
+      }
+    };
+    el.addEventListener("touchmove", handler, { passive: false });
+    return () => el.removeEventListener("touchmove", handler);
+  }, []);
+
   const touchStartRef = useRef(null);
-  const onTouchStart = (e) => { touchStartRef.current = { x: e.touches[0].clientX, moved: 0 }; };
-  const onTouchMove  = (e) => { if (touchStartRef.current) touchStartRef.current.moved = e.touches[0].clientX - touchStartRef.current.x; };
+  const onTouchStart = (e) => { touchStartRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, moved: 0, movedY: 0 }; };
+  const onTouchMove  = (e) => { if (touchStartRef.current) { touchStartRef.current.moved = e.touches[0].clientX - touchStartRef.current.x; touchStartRef.current.movedY = e.touches[0].clientY - touchStartRef.current.y; } };
   const onTouchEnd   = (e) => {
     const d = touchStartRef.current; touchStartRef.current = null;
     if (!d) return;
@@ -1447,7 +1461,8 @@ function ProductCarousel({ onZoom }) {
       <div style={{ position: "relative", width: "100%", userSelect: "none" }}>
         {/* Carousel track — touch handlers ONLY here, not on arrows */}
         <div
-          style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", height: "clamp(300px, 80vw, 520px)" }}
+          ref={trackRef}
+          style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", height: "clamp(300px, 80vw, 520px)", touchAction: "pan-y" }}
           onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
         >
           <SideCard idx={prevIdx} side="left" />
@@ -1697,7 +1712,7 @@ function ZoomModal({ onClose, initialActive, syncGo }) {
           onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
           onClick={onDoubleTap}
           style={{
-            width: "min(90vw, 480px)", aspectRatio: "1/1",
+            width: "min(88vw, 88vh, 520px)", height: "min(88vw, 88vh, 520px)",
             pointerEvents: "all",
             animation: "zoomOpen 0.3s cubic-bezier(0.22,1,0.36,1) forwards",
             borderRadius: "1.75rem", overflow: "hidden",
@@ -1705,6 +1720,7 @@ function ZoomModal({ onClose, initialActive, syncGo }) {
             boxShadow: "0 0 0 1px rgba(200,140,60,0.22), 0 16px 48px rgba(0,0,0,0.5)",
             background: "radial-gradient(ellipse at 30% 25%, #5C3D2A 0%, #3A2015 40%, #1E0E07 100%)",
             willChange: "transform",
+            flexShrink: 0,
           }}
         >
           <div style={{
@@ -2302,7 +2318,22 @@ export default function App() {
     if (action === "sync") { setZoomActive(active); zoomGoRef.current = go; }
     if (action === "open") { setZoomOpen(true); }
   };
-  useEffect(() => { document.body.style.overflow = zoomOpen ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [zoomOpen]);
+  useEffect(() => {
+    if (zoomOpen) {
+      const y = window.scrollY;
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.top = `-${y}px`;
+      document.body.style.width = "100%";
+      return () => {
+        document.body.style.overflow = "";
+        document.body.style.position = "";
+        document.body.style.top = "";
+        document.body.style.width = "";
+        window.scrollTo(0, y);
+      };
+    }
+  }, [zoomOpen]);
 
   return (
     <div className="min-h-screen font-sans" style={{ background: C.bg, color: C.ink, fontFamily: FONT_BODY }}>
