@@ -1357,6 +1357,8 @@ function CarouselSlide({ label, sub, size = "main", floating = false }) {
       position: "relative",
       borderRadius: "inherit", overflow: "hidden",
       background: "radial-gradient(ellipse at 30% 25%, #5C3D2A 0%, #3A2015 40%, #1E0E07 100%)",
+      transform: "translateZ(0)",
+      willChange: floating ? "transform" : "auto",
       ...floatStyle,
     }}>
       <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E\")" }} />
@@ -1370,275 +1372,414 @@ function CarouselSlide({ label, sub, size = "main", floating = false }) {
   );
 }
 
-function ProductCarousel({ zoomed, setZoomed, stateRef }) {
-  const [active, setActive]   = useState(0);
-  const [prev2,  setPrev2]    = useState(null);
-  const [fading, setFading]   = useState(false);
-  const [hovered, setHovered] = useState(false);
-  const [drag, setDrag]       = useState(null);
-  const [zDrag, setZDrag]     = useState(null);
-  const dragRef               = useRef(null);
+function ProductCarousel({ onZoom }) {
+  const [active, setActive] = useState(0);
+  const [fadeDir, setFadeDir] = useState(null);
+  const [prev2,  setPrev2]  = useState(null);
   const total = SLIDES.length;
+  const userActedRef = useRef(false);
 
   const go = (idx) => {
     const next = (idx + total) % total;
     if (next === active) return;
-    setPrev2(active); setFading(true); setActive(next);
-    setTimeout(() => { setPrev2(null); setFading(false); }, 420);
+    setPrev2(active);
+    setFadeDir("in");
+    setActive(next);
+    setTimeout(() => { setPrev2(null); setFadeDir(null); }, 380);
   };
 
-  // Keep stateRef current so ProductPage zoom modal can read active/go
-  if (stateRef) {
-    stateRef.current = { active: active, go: go };
-  }
-
-  // Lock / unlock body scroll when zoomed
+  // Auto-advance every 4s, pauses after user interaction for 8s
   useEffect(() => {
-    document.body.style.overflow = zoomed ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
-  }, [zoomed]);
+    const tick = () => {
+      if (!userActedRef.current) {
+        setActive(a => {
+          const next = (a + 1) % total;
+          setPrev2(a); setFadeDir("in");
+          setTimeout(() => { setPrev2(null); setFadeDir(null); }, 380);
+          return next;
+        });
+      }
+    };
+    const id = setInterval(tick, 4000);
+    return () => clearInterval(id);
+  }, [total]);
 
-  // Escape key closes zoom
-  useEffect(() => {
-    const h = (e) => { if (e.key === "Escape") setZoomed(false); };
-    window.addEventListener("keydown", h);
-    return () => window.removeEventListener("keydown", h);
-  }, []);
-
-  // Scroll wheel inside zoom → change slide
-  useEffect(() => {
-    if (!zoomed) return;
-    const h = (e) => { e.preventDefault(); go(active + (e.deltaX > 0 || e.deltaY > 0 ? 1 : -1)); };
-    window.addEventListener("wheel", h, { passive: false });
-    return () => window.removeEventListener("wheel", h);
-  }, [zoomed, active]);
-
-  // Swipe on main carousel
-  const onTouchStart = (e) => { dragRef.current = { startX: e.touches[0].clientX, moved: 0 }; setDrag(dragRef.current); };
-  const onTouchMove  = (e) => {
-    if (!dragRef.current) return;
-    const moved = e.touches[0].clientX - dragRef.current.startX;
-    dragRef.current.moved = moved;
-    setDrag({ ...dragRef.current });
+  const goManual = (idx) => {
+    userActedRef.current = true;
+    setTimeout(() => { userActedRef.current = false; }, 8000);
+    go(idx);
   };
-  const onTouchEnd = (e) => {
-    const d = dragRef.current;
-    dragRef.current = null;
-    setDrag(null);
+
+  useEffect(() => { onZoom && onZoom("sync", active, goManual); }, [active]);
+
+  const touchStartRef = useRef(null);
+  const onTouchStart = (e) => { touchStartRef.current = { x: e.touches[0].clientX, moved: 0 }; };
+  const onTouchMove  = (e) => { if (touchStartRef.current) touchStartRef.current.moved = e.touches[0].clientX - touchStartRef.current.x; };
+  const onTouchEnd   = (e) => {
+    const d = touchStartRef.current; touchStartRef.current = null;
     if (!d) return;
-    if (Math.abs(d.moved) > 40) {
-      go(d.moved < 0 ? active + 1 : active - 1);
-    } else if (Math.abs(d.moved) < 8) {
-      e.preventDefault(); // prevent synthetic click from firing after touch
-      setZoomed(true);
-    }
+    if (Math.abs(d.moved) > 40) goManual(d.moved < 0 ? active + 1 : active - 1);
+    else if (Math.abs(d.moved) < 8) { onZoom && onZoom("open"); }
   };
 
-  // Swipe inside zoom modal
-  const onZTouchStart = (e) => setZDrag({ startX: e.touches[0].clientX, moved: 0 });
-  const onZTouchMove  = (e) => {
-    if (zDrag) setZDrag(function(d) { return { startX: d.startX, moved: e.touches[0].clientX - d.startX }; });
-  };
-  const onZTouchEnd   = () => {
-    if (Math.abs(zDrag ? zDrag.moved : 0) > 40) go(zDrag.moved < 0 ? active + 1 : active - 1);
-    setZDrag(null);
-  };
+  const prevIdx = (active - 1 + total) % total;
+  const nextIdx = (active + 1) % total;
 
-  const prevIdx   = (active - 1 + total) % total;
-  const nextIdx   = (active + 1) % total;
-  const mainScale = hovered ? 1.04 : 1;
-
-  const ArrowBtn = ({ dir, onClick, style: s }) => (
-    <button onClick={onClick} style={{
-      width: 36, height: 36, borderRadius: "50%", border: "none", cursor: "pointer",
-      background: "rgba(200,168,130,0.15)", backdropFilter: "blur(6px)",
-      WebkitBackdropFilter: "blur(6px)",
-      color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center",
-      fontSize: 18, fontWeight: 300, lineHeight: 1,
-      transition: "background 0.2s ease, transform 0.2s ease",
-      flexShrink: 0,
-      ...s,
-    }}>{dir === "prev" ? "‹" : "›"}</button>
+  const SideCard = ({ idx, side }) => (
+    <div onClick={() => goManual(idx)} style={{
+      position: "absolute", [side]: "-18px",
+      width: "clamp(90px, 22vw, 160px)", height: "clamp(90px, 22vw, 160px)",
+      opacity: 0.22, cursor: "pointer", zIndex: 1,
+      borderRadius: "1rem", overflow: "hidden",
+      filter: "blur(2px) brightness(0.7)",
+    }}>
+      <CarouselSlide {...SLIDES[idx]} size="side" />
+    </div>
   );
 
   return (
     <>
       <style>{`
-        @keyframes floatCard {
-          0%, 100% { transform: translateY(0px) rotate(-1deg); }
-          50%       { transform: translateY(-10px) rotate(1deg); }
-        }
-        @keyframes slideIn  { from { opacity:0; transform:scale(0.96); } to { opacity:1; transform:scale(1); } }
-        @keyframes slideOut { from { opacity:1; } to { opacity:0; } }
-        @keyframes zoomIn   { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
-        @keyframes zBgIn    { from { opacity:0; } to { opacity:1; } }
+        @keyframes fadeSlideIn  { from { opacity:0; transform:scale(0.97); } to { opacity:1; transform:scale(1); } }
+        @keyframes fadeSlideOut { from { opacity:1; transform:scale(1);    } to { opacity:0; transform:scale(0.97); } }
       `}</style>
 
-      {/* ── Main carousel ── */}
-      <div style={{ position: "relative", width: "100%", userSelect: "none" }}
-        onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
-      >
-        <div style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", height: "clamp(260px, 55vw, 460px)" }}>
+      <div style={{ position: "relative", width: "100%", userSelect: "none" }}>
+        {/* Carousel track — touch handlers ONLY here, not on arrows */}
+        <div
+          style={{ position: "relative", display: "flex", alignItems: "center", justifyContent: "center", height: "clamp(300px, 80vw, 520px)" }}
+          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+        >
+          <SideCard idx={prevIdx} side="left" />
 
-          {/* Prev side card */}
-          <div onClick={() => go(active - 1)} style={{
-            position: "absolute", left: "clamp(-10px, -2vw, 0px)",
-            width: "clamp(110px, 26vw, 200px)", height: "clamp(110px, 26vw, 200px)",
-            opacity: 0.4, cursor: "pointer", filter: "blur(1.5px)", zIndex: 1,
-          }}>
-            <CarouselSlide {...SLIDES[prevIdx]} size="side" floating />
-          </div>
-
-          {/* Main card */}
+          {/* Main card — click opens zoom, touch handled by parent track */}
           <div
-            onMouseEnter={() => setHovered(true)}
-            onMouseLeave={() => setHovered(false)}
-            onClick={() => setZoomed(true)}
+            onClick={() => { onZoom && onZoom("open"); }}
             style={{
               position: "relative", cursor: "zoom-in",
-              width: "clamp(220px, 52vw, 400px)", height: "clamp(220px, 52vw, 400px)",
+              width: "clamp(260px, 72vw, 480px)", height: "clamp(260px, 72vw, 480px)",
               zIndex: 2,
               boxShadow: "0 24px 60px rgba(5,2,1,0.55)",
-              borderRadius: "1.25rem", overflow: "hidden",
-              transform: `scale(${mainScale})`,
-              transition: "transform 0.35s cubic-bezier(0.34,1.56,0.64,1)",
+              borderRadius: "1.5rem", overflow: "hidden",
+              flexShrink: 0,
+              willChange: "transform",
             }}
           >
-            <div key={active} style={{ position: "absolute", inset: 0, animation: fading ? "slideIn 0.4s ease forwards" : "none", borderRadius: "1.25rem", overflow: "hidden" }}>
+            <div key={active} style={{
+              position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden",
+              animation: fadeDir === "in" ? "fadeSlideIn 0.38s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
+            }}>
               <CarouselSlide {...SLIDES[active]} size="main" />
             </div>
             {prev2 !== null && (
-              <div key={`out-${prev2}`} style={{ position: "absolute", inset: 0, animation: "slideOut 0.35s ease forwards", borderRadius: "1.25rem", overflow: "hidden" }}>
+              <div key={`out-${prev2}`} style={{
+                position: "absolute", inset: 0, borderRadius: "inherit", overflow: "hidden",
+                animation: "fadeSlideOut 0.32s ease forwards",
+              }}>
                 <CarouselSlide {...SLIDES[prev2]} size="main" />
               </div>
             )}
+            {/* Fullscreen hint icon */}
+            <div style={{
+              position: "absolute", bottom: 10, right: 10, zIndex: 5,
+              width: 28, height: 28, borderRadius: 8,
+              background: "rgba(200,168,130,0.18)", backdropFilter: "blur(6px)",
+              WebkitBackdropFilter: "blur(6px)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              pointerEvents: "none",
+            }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#C8A882" strokeWidth="2" strokeLinecap="round">
+                <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+              </svg>
+            </div>
           </div>
 
-          {/* Next side card */}
-          <div onClick={() => go(active + 1)} style={{
-            position: "absolute", right: "clamp(-10px, -2vw, 0px)",
-            width: "clamp(110px, 26vw, 200px)", height: "clamp(110px, 26vw, 200px)",
-            opacity: 0.4, cursor: "pointer", filter: "blur(1.5px)", zIndex: 1,
-          }}>
-            <CarouselSlide {...SLIDES[nextIdx]} size="side" floating />
-          </div>
+          <SideCard idx={nextIdx} side="right" />
         </div>
 
-        {/* Arrow buttons + dots row */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 12, marginTop: 16 }}>
-          <ArrowBtn dir="prev" onClick={() => go(active - 1)} />
+        {/* Arrow + dots row — completely isolated from touch handlers above */}
+        <div
+          style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 14, marginTop: 14 }}
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+          onTouchMove={(e) => e.stopPropagation()}
+        >
+          <button
+            onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); goManual(active - 1); }}
+            onClick={(e) => { e.stopPropagation(); goManual(active - 1); }}
+            style={{
+              width: 36, height: 36, borderRadius: "50%", border: "1px solid rgba(200,168,130,0.25)",
+              background: "rgba(200,168,130,0.10)", color: "#C8A882",
+              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 20,
+              flexShrink: 0, touchAction: "none",
+            }}>‹</button>
           <div style={{ display: "flex", gap: 6 }}>
             {SLIDES.map((_, i) => (
-              <button key={i} onClick={() => go(i)} style={{
-                width: i === active ? 20 : 6, height: 6, borderRadius: 3,
-                background: i === active ? "#C8A882" : "rgba(200,168,130,0.3)",
-                border: "none", padding: 0, cursor: "pointer",
-                transition: "width 0.3s ease, background 0.3s ease",
-              }} />
+              <button key={i}
+                onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); goManual(i); }}
+                onClick={(e) => { e.stopPropagation(); goManual(i); }}
+                style={{
+                  width: i === active ? 20 : 6, height: 6, borderRadius: 3,
+                  background: i === active ? "#C8A882" : "rgba(200,168,130,0.3)",
+                  border: "none", padding: 0, cursor: "pointer",
+                  transition: "width 0.3s ease, background 0.3s ease",
+                  touchAction: "none",
+                }} />
             ))}
           </div>
-          <ArrowBtn dir="next" onClick={() => go(active + 1)} />
+          <button
+            onTouchEnd={(e) => { e.stopPropagation(); e.preventDefault(); goManual(active + 1); }}
+            onClick={(e) => { e.stopPropagation(); goManual(active + 1); }}
+            style={{
+              width: 36, height: 36, borderRadius: "50%", border: "1px solid rgba(200,168,130,0.25)",
+              background: "rgba(200,168,130,0.10)", color: "#C8A882",
+              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 20,
+              flexShrink: 0, touchAction: "none",
+            }}>›</button>
         </div>
       </div>
     </>
   );
 }
 
-function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProduct, onBack }) {
-  const product = PRODUCTS.find((p) => p.id === productId);
-  const [notified, setNotified] = useState(false);
-  const [zoomed, setZoomed]     = useState(false);
-  const stateRef = useRef({ active: 0, go: function() {} });
+/* ── Zoom Modal with pinch-to-zoom + pan ───────────────────────────── */
+function ZoomModal({ onClose, initialActive, syncGo }) {
+  const [active, setActive] = useState(initialActive);
+  const [fadeDir, setFadeDir] = useState(null);
+  const [prev2, setPrev2] = useState(null);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const total = SLIDES.length;
 
-  useEffect(() => { setNotified(false); setZoomed(false); }, [productId]);
-  if (!product) return null;
+  // Touch tracking
+  const touchRef = useRef(null); // { type: "swipe"|"pinch"|"pan", ... }
+  const scaleRef = useRef(1);
+  const offsetRef = useRef({ x: 0, y: 0 });
 
-  const related = PRODUCTS.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4);
+  const go = (idx) => {
+    const next = (idx + total) % total;
+    if (next === active) return;
+    // Reset zoom on slide change
+    setScale(1); setOffset({ x: 0, y: 0 });
+    scaleRef.current = 1; offsetRef.current = { x: 0, y: 0 };
+    setPrev2(active); setFadeDir("in"); setActive(next);
+    setTimeout(() => { setPrev2(null); setFadeDir(null); }, 380);
+    syncGo && syncGo(next);
+  };
 
-  const REVIEWS = [
-    { name: "Jordan M.", text: "Fits true to size and the cushioning held up over a full marathon block.", stars: 5 },
-    { name: "Priya K.",  text: "Material feels premium, exactly like the photos. Shipping was fast too.",  stars: 5 },
-    { name: "Sam R.",    text: "Great quality overall, sizing ran slightly large for me.",                  stars: 4 },
-  ];
+  useEffect(() => {
+    const h = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  }, []);
 
-  const api = carouselAPI.current;
+  // Mouse wheel zoom
+  useEffect(() => {
+    const h = (e) => {
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey || Math.abs(e.deltaY) > 20) {
+        const delta = e.deltaY < 0 ? 0.15 : -0.15;
+        const next = Math.max(1, Math.min(4, scaleRef.current + delta));
+        scaleRef.current = next;
+        setScale(next);
+        if (next === 1) { setOffset({ x: 0, y: 0 }); offsetRef.current = { x: 0, y: 0 }; }
+      } else {
+        go(active + (e.deltaX > 20 ? 1 : e.deltaX < -20 ? -1 : 0));
+      }
+    };
+    window.addEventListener("wheel", h, { passive: false });
+    return () => window.removeEventListener("wheel", h);
+  }, [active]);
+
+  const getDist = (t) => {
+    const dx = t[0].clientX - t[1].clientX, dy = t[0].clientY - t[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+  const getMid = (t) => ({ x: (t[0].clientX + t[1].clientX) / 2, y: (t[0].clientY + t[1].clientY) / 2 });
+
+  const onTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      touchRef.current = { type: "pinch", startDist: getDist(e.touches), startScale: scaleRef.current };
+    } else {
+      touchRef.current = { type: scaleRef.current > 1 ? "pan" : "swipe", startX: e.touches[0].clientX, startY: e.touches[0].clientY, startOff: { ...offsetRef.current } };
+    }
+  };
+
+  const onTouchMove = (e) => {
+    if (!touchRef.current) return;
+    if (touchRef.current.type === "pinch" && e.touches.length === 2) {
+      const next = Math.max(1, Math.min(4, touchRef.current.startScale * (getDist(e.touches) / touchRef.current.startDist)));
+      scaleRef.current = next;
+      setScale(next);
+      if (next <= 1) { setOffset({ x: 0, y: 0 }); offsetRef.current = { x: 0, y: 0 }; }
+    } else if (touchRef.current.type === "pan") {
+      const dx = e.touches[0].clientX - touchRef.current.startX;
+      const dy = e.touches[0].clientY - touchRef.current.startY;
+      const next = { x: touchRef.current.startOff.x + dx, y: touchRef.current.startOff.y + dy };
+      offsetRef.current = next; setOffset(next);
+    }
+  };
+
+  const onTouchEnd = (e) => {
+    if (!touchRef.current) return;
+    const t = touchRef.current; touchRef.current = null;
+    if (t.type === "swipe") {
+      const moved = e.changedTouches[0].clientX - t.startX;
+      if (Math.abs(moved) > 40) go(moved < 0 ? active + 1 : active - 1);
+    }
+    if (scaleRef.current < 1.05) { setScale(1); setOffset({ x: 0, y: 0 }); scaleRef.current = 1; offsetRef.current = { x: 0, y: 0 }; }
+  };
+
+  // Double-tap to zoom
+  const lastTapRef = useRef(0);
+  const onDoubleTap = (e) => {
+    const now = Date.now();
+    if (now - lastTapRef.current < 300) {
+      if (scaleRef.current > 1) { setScale(1); setOffset({ x: 0, y: 0 }); scaleRef.current = 1; offsetRef.current = { x: 0, y: 0 }; }
+      else { scaleRef.current = 2.5; setScale(2.5); }
+    }
+    lastTapRef.current = now;
+  };
 
   return (
     <>
-      {/* ── Zoom modal at true root level — no ancestor transforms/filters ── */}
-      {zoomed && (
-        <>
-          <div onClick={() => setZoomed(false)} style={{
-            position: "fixed", inset: 0, zIndex: 9998,
-            background: "rgba(10,4,2,0.55)",
-            backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
-          }} />
+      <style>{`
+        @keyframes fadeSlideIn  { from { opacity:0; transform:scale(0.97); } to { opacity:1; transform:scale(1); } }
+        @keyframes fadeSlideOut { from { opacity:1; } to { opacity:0; } }
+        @keyframes zoomOpen { from { opacity:0; transform:scale(0.93); } to { opacity:1; transform:scale(1); } }
+      `}</style>
+
+      <div onClick={onClose} style={{
+        position: "fixed", inset: 0, zIndex: 9998,
+        background: "rgba(6,2,1,0.88)",
+        backdropFilter: "blur(20px)", WebkitBackdropFilter: "blur(20px)",
+      }} />
+
+      <div style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        pointerEvents: "none",
+      }}>
+
+        {/* Close */}
+        <button onClick={onClose} style={{
+          position: "absolute", top: 20, right: 20, width: 36, height: 36, borderRadius: "50%",
+          background: "rgba(200,168,130,0.15)", border: "1px solid rgba(200,168,130,0.3)",
+          color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center",
+          cursor: "pointer", pointerEvents: "all",
+        }}><X size={15} /></button>
+
+        {/* Zoom controls */}
+        <div style={{ position: "absolute", top: 20, left: 20, display: "flex", gap: 8, pointerEvents: "all" }}>
+          <button onClick={() => { const n = Math.min(4, scaleRef.current + 0.5); scaleRef.current = n; setScale(n); }} style={{
+            width: 36, height: 36, borderRadius: "50%", background: "rgba(200,168,130,0.15)", border: "1px solid rgba(200,168,130,0.3)",
+            color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 20, fontWeight: 300,
+          }}>+</button>
+          <button onClick={() => { const n = Math.max(1, scaleRef.current - 0.5); scaleRef.current = n; setScale(n); if (n <= 1) { setOffset({ x: 0, y: 0 }); offsetRef.current = { x: 0, y: 0 }; } }} style={{
+            width: 36, height: 36, borderRadius: "50%", background: "rgba(200,168,130,0.15)", border: "1px solid rgba(200,168,130,0.3)",
+            color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 20, fontWeight: 300,
+          }}>−</button>
+          {scale > 1 && (
+            <button onClick={() => { setScale(1); setOffset({ x: 0, y: 0 }); scaleRef.current = 1; offsetRef.current = { x: 0, y: 0 }; }} style={{
+              height: 36, padding: "0 12px", borderRadius: 18, background: "rgba(200,168,130,0.12)", border: "1px solid rgba(200,168,130,0.25)",
+              color: "#C8A882", fontSize: 11, letterSpacing: "0.1em", cursor: "pointer",
+            }}>RESET</button>
+          )}
+        </div>
+
+        {/* Slide counter */}
+        <div style={{ position: "absolute", top: 26, left: "50%", transform: "translateX(-50%)", fontSize: 11, letterSpacing: "0.15em", color: "rgba(200,168,130,0.5)" }}>
+          {active + 1} / {total}
+        </div>
+
+        {/* Image */}
+        <div
+          onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}
+          onClick={onDoubleTap}
+          style={{
+            width: "min(90vw, 480px)", aspectRatio: "1/1",
+            pointerEvents: "all",
+            animation: "zoomOpen 0.3s cubic-bezier(0.22,1,0.36,1) forwards",
+            borderRadius: "1.75rem", overflow: "hidden",
+            position: "relative",
+            boxShadow: "0 0 0 1px rgba(200,140,60,0.22), 0 16px 48px rgba(0,0,0,0.5)",
+            background: "radial-gradient(ellipse at 30% 25%, #5C3D2A 0%, #3A2015 40%, #1E0E07 100%)",
+            willChange: "transform",
+          }}
+        >
           <div style={{
-            position: "fixed", inset: 0, zIndex: 9999,
-            display: "flex", flexDirection: "column",
-            alignItems: "center", justifyContent: "center",
+            position: "absolute", inset: 0,
+            transform: `scale(${scale}) translate(${offset.x / scale}px, ${offset.y / scale}px)`,
+            transition: scale === 1 ? "transform 0.3s ease" : "none",
+            transformOrigin: "center center",
+            willChange: "transform",
           }}>
-            <button onClick={() => setZoomed(false)} style={{
-              position: "absolute", top: 20, right: 20,
-              width: 36, height: 36, borderRadius: "50%",
-              background: "rgba(200,168,130,0.10)", border: "1px solid rgba(200,168,130,0.22)",
-              color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-            }}><X size={15} /></button>
-
-            <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 16px", width: "100%", maxWidth: 520 }}>
-              <button onClick={() => stateRef.current.go(stateRef.current.active - 1)} style={{
-                width: 40, height: 40, borderRadius: "50%", border: "none", flexShrink: 0,
-                background: "rgba(200,168,130,0.15)", color: "#C8A882",
-                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-                fontSize: 20,
-              }}>‹</button>
-
-              <div style={{
-                flex: 1, aspectRatio: "1/1", borderRadius: "1.5rem",
-                overflow: "hidden", position: "relative",
-                boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
-                border: "1px solid rgba(200,140,60,0.2)",
-                background: "radial-gradient(ellipse at 30% 25%, #5C3D2A 0%, #3A2015 40%, #1E0E07 100%)",
-              }}>
-                {/* Render slide content directly — no CarouselSlide to avoid any inheritance issues */}
-                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
-                  <p style={{ fontFamily: FONT_ACCENT, fontStyle: "italic", color: "#C8A882", fontSize: "1.6rem", margin: 0 }}>
-                    {SLIDES[stateRef.current.active].label}
-                  </p>
-                  <p style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(200,168,130,0.45)", margin: 0 }}>
-                    {SLIDES[stateRef.current.active].sub}
-                  </p>
-                </div>
+            <div key={active} style={{
+              position: "absolute", inset: 0,
+              animation: fadeDir === "in" ? "fadeSlideIn 0.38s cubic-bezier(0.22,1,0.36,1) forwards" : "none",
+            }}>
+              <CarouselSlide {...SLIDES[active]} size="main" />
+            </div>
+            {prev2 !== null && (
+              <div key={`out-${prev2}`} style={{ position: "absolute", inset: 0, animation: "fadeSlideOut 0.32s ease forwards" }}>
+                <CarouselSlide {...SLIDES[prev2]} size="main" />
               </div>
-
-              <button onClick={() => stateRef.current.go(stateRef.current.active + 1)} style={{
-                width: 40, height: 40, borderRadius: "50%", border: "none", flexShrink: 0,
-                background: "rgba(200,168,130,0.15)", color: "#C8A882",
-                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
-                fontSize: 20,
-              }}>›</button>
-            </div>
-
-            <div style={{ display: "flex", gap: 6, marginTop: 20 }}>
-              {SLIDES.map((_, i) => (
-                <button key={i} onClick={() => stateRef.current.go(i)} style={{
-                  width: i === stateRef.current.active ? 20 : 6, height: 6, borderRadius: 3,
-                  background: i === stateRef.current.active ? "#C8A882" : "rgba(200,168,130,0.3)",
-                  border: "none", padding: 0, cursor: "pointer",
-                  transition: "width 0.3s ease",
-                }} />
-              ))}
-            </div>
+            )}
           </div>
-        </>
-      )}
+          {scale > 1 && (
+            <div style={{ position: "absolute", bottom: 10, right: 10, fontSize: 10, color: "rgba(200,168,130,0.5)", letterSpacing: "0.1em" }}>
+              {Math.round(scale * 100)}%
+            </div>
+          )}
+        </div>
 
+        {/* Arrows + dots */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 16, marginTop: 18, pointerEvents: "all" }}>
+          <button onClick={() => go(active - 1)} style={{
+            width: 40, height: 40, borderRadius: "50%", border: "1px solid rgba(200,168,130,0.25)",
+            background: "rgba(200,168,130,0.12)", color: "#C8A882",
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 22,
+          }}>‹</button>
+          <div style={{ display: "flex", gap: 6 }}>
+            {SLIDES.map((_, i) => (
+              <button key={i} onClick={() => go(i)} style={{
+                width: i === active ? 20 : 6, height: 6, borderRadius: 3,
+                background: i === active ? "#C8A882" : "rgba(200,168,130,0.3)",
+                border: "none", padding: 0, cursor: "pointer", transition: "width 0.3s ease",
+              }} />
+            ))}
+          </div>
+          <button onClick={() => go(active + 1)} style={{
+            width: 40, height: 40, borderRadius: "50%", border: "1px solid rgba(200,168,130,0.25)",
+            background: "rgba(200,168,130,0.12)", color: "#C8A882",
+            display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 22,
+          }}>›</button>
+        </div>
+
+        <p style={{ marginTop: 10, fontSize: 10, letterSpacing: "0.12em", color: "rgba(200,168,130,0.35)", pointerEvents: "none" }}>
+          Pinch or double-tap to zoom · Swipe to navigate
+        </p>
+      </div>
+    </>
+  );
+}
+
+function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProduct, onBack, onZoom }) {
+  const product = PRODUCTS.find((p) => p.id === productId);
+  const [notified, setNotified] = useState(false);
+
+  useEffect(() => { setNotified(false); }, [productId]);
+
+  if (!product) return null;
+
+  return (
+    <>
       {/* ── Page content ── */}
       <div style={{ background: C.bg, minHeight: "100vh" }}>
         <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 sm:pt-8">
           <BackButton onBack={onBack} />
           <div style={{ marginTop: "0.75rem" }}>
-            <ProductCarousel zoomed={zoomed} setZoomed={setZoomed} stateRef={stateRef} />
+            <ProductCarousel onZoom={onZoom} />
           </div>
 
         {/* ── Title + price — fades up ── */}
@@ -2154,6 +2295,15 @@ export default function App() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const [zoomOpen,   setZoomOpen]   = useState(false);
+  const [zoomActive, setZoomActive] = useState(0);
+  const zoomGoRef = useRef(null);
+  const handleZoomFromPage = (action, active, go) => {
+    if (action === "sync") { setZoomActive(active); zoomGoRef.current = go; }
+    if (action === "open") { setZoomOpen(true); }
+  };
+  useEffect(() => { document.body.style.overflow = zoomOpen ? "hidden" : ""; return () => { document.body.style.overflow = ""; }; }, [zoomOpen]);
+
   return (
     <div className="min-h-screen font-sans" style={{ background: C.bg, color: C.ink, fontFamily: FONT_BODY }}>
       <GlobalFonts />
@@ -2163,10 +2313,10 @@ export default function App() {
       `}</style>
       <Navbar cartCount={cartCount} wishlist={wishlist} onNav={handleNav} onCart={() => setCartOpen(true)} onWishlist={() => setWishlistOpen(true)} query={query} setQuery={setQuery} />
 
-      <div key={fadeKey} className="page-fade" style={{ contain: "paint" }}>
+      <div key={fadeKey} className="page-fade">
         {view === "home"     && <HomePage     onNav={handleNav} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} />}
         {view === "category" && <CategoryPage category={category} onOpenProduct={openProduct} wishlist={wishlist} toggleWish={toggleWish} query={query} onBack={handleBack} />}
-        {view === "product"  && <ProductPage  productId={productId} onAddToCart={addToCart} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={openProduct} onBack={handleBack} />}
+        {view === "product"  && <ProductPage  productId={productId} onAddToCart={addToCart} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={openProduct} onBack={handleBack} onZoom={handleZoomFromPage} />}
         {view === "checkout" && <CheckoutPage cart={cart} onComplete={handleCheckoutComplete} onBack={() => { setView("home"); setCartOpen(true); }} />}
         {view === "success"  && <SuccessPage  total={orderTotal} onContinue={() => handleNav("home")} />}
         {view === "contact"  && <ContactPage onBack={handleBack} />}
@@ -2177,6 +2327,13 @@ export default function App() {
       <CartDrawer open={cartOpen} onClose={() => setCartOpen(false)} cart={cart} updateQty={updateQty} removeItem={removeItem}
         onCheckout={() => { setCartOpen(false); setView("checkout"); window.scrollTo({ top: 0 }); }} />
       <WishlistModal open={wishlistOpen} onClose={() => setWishlistOpen(false)} wishlist={wishlist} toggleWish={toggleWish} onOpenProduct={(id) => { setWishlistOpen(false); openProduct(id); }} />
+      {zoomOpen && (
+        <ZoomModal
+          onClose={() => setZoomOpen(false)}
+          initialActive={zoomActive}
+          syncGo={(idx) => zoomGoRef.current && zoomGoRef.current(idx)}
+        />
+      )}
     </div>
   );
 }
