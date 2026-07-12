@@ -378,11 +378,11 @@ function CinematicHero({ onNav }) {
         const hiIdx   = Math.min(FRAME_COUNT - 1, loIdx + 1);
         const blend   = rawPos - loIdx; // 0.0 → 1.0
 
-        if (frames[loIdx]?.naturalWidth) {
+        if (frames[loIdx] && frames[loIdx].naturalWidth) {
           ctx.globalAlpha = 1;
           drawImageCover(ctx, frames[loIdx], W, H, -0.08);
         }
-        if (hiIdx !== loIdx && frames[hiIdx]?.naturalWidth && blend > 0.001) {
+        if (hiIdx !== loIdx && frames[hiIdx] && frames[hiIdx].naturalWidth && blend > 0.001) {
           ctx.globalAlpha = blend;
           drawImageCover(ctx, frames[hiIdx], W, H, -0.08);
           ctx.globalAlpha = 1;
@@ -1369,22 +1369,8 @@ function CarouselSlide({ label, sub, size = "main", floating = false }) {
     </div>
   );
 }
-      {/* noise */}
-      <div style={{ position: "absolute", inset: 0, opacity: 0.06, backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='200' height='200' filter='url(%23n)' opacity='1'/%3E%3C/svg%3E\")" }} />
-      {/* warm glow */}
-      <div style={{ position: "absolute", top: "-20%", left: "-10%", width: "55%", height: "55%", borderRadius: "50%", background: "radial-gradient(circle, rgba(200,140,70,0.2) 0%, transparent 70%)" }} />
-      {/* vignette */}
-      <div style={{ position: "absolute", inset: 0, background: "radial-gradient(ellipse at center, transparent 35%, rgba(10,4,2,0.6) 100%)" }} />
-      {/* text */}
-      <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 6, zIndex: 2 }}>
-        <p style={{ fontFamily: FONT_ACCENT, fontStyle: "italic", color: "#C8A882", fontSize: size === "main" ? "1.6rem" : "1rem", letterSpacing: "0.04em", margin: 0 }}>{label}</p>
-        <p style={{ fontSize: size === "main" ? 11 : 9, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(200,168,130,0.45)", margin: 0 }}>{sub}</p>
-      </div>
-    </div>
-  );
-}
 
-function ProductCarousel({ zoomed, setZoomed }) {
+function ProductCarousel({ zoomed, setZoomed, stateRef }) {
   const [active, setActive]   = useState(0);
   const [prev2,  setPrev2]    = useState(null);
   const [fading, setFading]   = useState(false);
@@ -1400,6 +1386,11 @@ function ProductCarousel({ zoomed, setZoomed }) {
     setPrev2(active); setFading(true); setActive(next);
     setTimeout(() => { setPrev2(null); setFading(false); }, 420);
   };
+
+  // Keep stateRef current so ProductPage zoom modal can read active/go
+  if (stateRef) {
+    stateRef.current = { active: active, go: go };
+  }
 
   // Lock / unlock body scroll when zoomed
   useEffect(() => {
@@ -1445,9 +1436,11 @@ function ProductCarousel({ zoomed, setZoomed }) {
 
   // Swipe inside zoom modal
   const onZTouchStart = (e) => setZDrag({ startX: e.touches[0].clientX, moved: 0 });
-  const onZTouchMove  = (e) => { if (zDrag) setZDrag(d => ({ ...d, moved: e.touches[0].clientX - d.startX })); };
+  const onZTouchMove  = (e) => {
+    if (zDrag) setZDrag(function(d) { return { startX: d.startX, moved: e.touches[0].clientX - d.startX }; });
+  };
   const onZTouchEnd   = () => {
-    if (Math.abs(zDrag?.moved ?? 0) > 40) go(zDrag.moved < 0 ? active + 1 : active - 1);
+    if (Math.abs(zDrag ? zDrag.moved : 0) > 40) go(zDrag.moved < 0 ? active + 1 : active - 1);
     setZDrag(null);
   };
 
@@ -1480,80 +1473,6 @@ function ProductCarousel({ zoomed, setZoomed }) {
         @keyframes zoomIn   { from { opacity:0; transform:scale(0.9); } to { opacity:1; transform:scale(1); } }
         @keyframes zBgIn    { from { opacity:0; } to { opacity:1; } }
       `}</style>
-
-      {/* ── Zoom modal ── */}
-      {zoomed && (
-        <>
-          {/* Backdrop: separate element, no children, just blur overlay */}
-          <div
-            onClick={() => setZoomed(false)}
-            style={{
-              position: "fixed", inset: 0, zIndex: 200,
-              background: "rgba(10,4,2,0.5)",
-              backdropFilter: "blur(14px)",
-              WebkitBackdropFilter: "blur(14px)",
-              animation: "zBgIn 0.25s ease",
-            }}
-          />
-
-          {/* Content: sibling div, NO filter/backdrop, renders sharp above blur */}
-          <div
-            style={{
-              position: "fixed", inset: 0, zIndex: 201,
-              display: "flex", flexDirection: "column",
-              alignItems: "center", justifyContent: "center",
-              gap: 0,
-            }}
-          >
-            {/* Close */}
-            <button
-              onClick={() => setZoomed(false)}
-              style={{
-                position: "absolute", top: 20, right: 20,
-                width: 36, height: 36, borderRadius: "50%",
-                background: "rgba(200,168,130,0.10)", border: "1px solid rgba(200,168,130,0.22)",
-                color: "#C8A882", display: "flex", alignItems: "center",
-                justifyContent: "center", cursor: "pointer",
-              }}
-            ><X size={15} /></button>
-
-            {/* Arrows + image */}
-            <div
-              onTouchStart={onZTouchStart} onTouchMove={onZTouchMove} onTouchEnd={onZTouchEnd}
-              style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 12px", width: "100%" }}
-            >
-              <ArrowBtn dir="prev" onClick={() => go(active - 1)} />
-
-              <div style={{
-                flex: 1,
-                aspectRatio: "1 / 1",
-                borderRadius: "2rem",
-                overflow: "hidden",
-                boxShadow: "0 24px 60px rgba(5,2,1,0.7)",
-                border: "1px solid rgba(200,140,60,0.18)",
-                animation: "zoomIn 0.32s cubic-bezier(0.22,1,0.36,1)",
-                position: "relative",
-              }}>
-                <CarouselSlide {...SLIDES[active]} size="main" />
-              </div>
-
-              <ArrowBtn dir="next" onClick={() => go(active + 1)} />
-            </div>
-
-            {/* Dots */}
-            <div style={{ display: "flex", gap: 6, marginTop: 20 }}>
-              {SLIDES.map((_, i) => (
-                <button key={i} onClick={() => go(i)} style={{
-                  width: i === active ? 20 : 6, height: 6, borderRadius: 3,
-                  background: i === active ? "#C8A882" : "rgba(200,168,130,0.3)",
-                  border: "none", padding: 0, cursor: "pointer",
-                  transition: "width 0.3s ease, background 0.3s ease",
-                }} />
-              ))}
-            </div>
-          </div>
-        </>
-      )}
 
       {/* ── Main carousel ── */}
       <div style={{ position: "relative", width: "100%", userSelect: "none" }}
@@ -1629,6 +1548,7 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
   const product = PRODUCTS.find((p) => p.id === productId);
   const [notified, setNotified] = useState(false);
   const [zoomed, setZoomed]     = useState(false);
+  const stateRef = useRef({ active: 0, go: function() {} });
 
   useEffect(() => { setNotified(false); setZoomed(false); }, [productId]);
   if (!product) return null;
@@ -1641,17 +1561,85 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
     { name: "Sam R.",    text: "Great quality overall, sizing ran slightly large for me.",                  stars: 4 },
   ];
 
+  const api = carouselAPI.current;
+
   return (
-    <div style={{ background: C.bg, minHeight: "100vh" }}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 sm:pt-8">
+    <>
+      {/* ── Zoom modal at true root level — no ancestor transforms/filters ── */}
+      {zoomed && (
+        <>
+          <div onClick={() => setZoomed(false)} style={{
+            position: "fixed", inset: 0, zIndex: 9998,
+            background: "rgba(10,4,2,0.55)",
+            backdropFilter: "blur(14px)", WebkitBackdropFilter: "blur(14px)",
+          }} />
+          <div style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            display: "flex", flexDirection: "column",
+            alignItems: "center", justifyContent: "center",
+          }}>
+            <button onClick={() => setZoomed(false)} style={{
+              position: "absolute", top: 20, right: 20,
+              width: 36, height: 36, borderRadius: "50%",
+              background: "rgba(200,168,130,0.10)", border: "1px solid rgba(200,168,130,0.22)",
+              color: "#C8A882", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+            }}><X size={15} /></button>
 
-        {/* Back */}
-        <BackButton onBack={onBack} />
+            <div style={{ display: "flex", alignItems: "center", gap: 16, padding: "0 16px", width: "100%", maxWidth: 520 }}>
+              <button onClick={() => stateRef.current.go(stateRef.current.active - 1)} style={{
+                width: 40, height: 40, borderRadius: "50%", border: "none", flexShrink: 0,
+                background: "rgba(200,168,130,0.15)", color: "#C8A882",
+                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                fontSize: 20,
+              }}>‹</button>
 
-        {/* ── Image Carousel — no Reveal wrapper so fixed modal isn't trapped ── */}
-        <div style={{ marginTop: "0.75rem" }}>
-          <ProductCarousel zoomed={zoomed} setZoomed={setZoomed} />
-        </div>
+              <div style={{
+                flex: 1, aspectRatio: "1/1", borderRadius: "1.5rem",
+                overflow: "hidden", position: "relative",
+                boxShadow: "0 20px 60px rgba(0,0,0,0.6)",
+                border: "1px solid rgba(200,140,60,0.2)",
+                background: "radial-gradient(ellipse at 30% 25%, #5C3D2A 0%, #3A2015 40%, #1E0E07 100%)",
+              }}>
+                {/* Render slide content directly — no CarouselSlide to avoid any inheritance issues */}
+                <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 8 }}>
+                  <p style={{ fontFamily: FONT_ACCENT, fontStyle: "italic", color: "#C8A882", fontSize: "1.6rem", margin: 0 }}>
+                    {SLIDES[stateRef.current.active].label}
+                  </p>
+                  <p style={{ fontSize: 11, letterSpacing: "0.22em", textTransform: "uppercase", color: "rgba(200,168,130,0.45)", margin: 0 }}>
+                    {SLIDES[stateRef.current.active].sub}
+                  </p>
+                </div>
+              </div>
+
+              <button onClick={() => stateRef.current.go(stateRef.current.active + 1)} style={{
+                width: 40, height: 40, borderRadius: "50%", border: "none", flexShrink: 0,
+                background: "rgba(200,168,130,0.15)", color: "#C8A882",
+                display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer",
+                fontSize: 20,
+              }}>›</button>
+            </div>
+
+            <div style={{ display: "flex", gap: 6, marginTop: 20 }}>
+              {SLIDES.map((_, i) => (
+                <button key={i} onClick={() => stateRef.current.go(i)} style={{
+                  width: i === stateRef.current.active ? 20 : 6, height: 6, borderRadius: 3,
+                  background: i === stateRef.current.active ? "#C8A882" : "rgba(200,168,130,0.3)",
+                  border: "none", padding: 0, cursor: "pointer",
+                  transition: "width 0.3s ease",
+                }} />
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Page content ── */}
+      <div style={{ background: C.bg, minHeight: "100vh" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-8 pt-6 sm:pt-8">
+          <BackButton onBack={onBack} />
+          <div style={{ marginTop: "0.75rem" }}>
+            <ProductCarousel zoomed={zoomed} setZoomed={setZoomed} stateRef={stateRef} />
+          </div>
 
         {/* ── Title + price — fades up ── */}
         <Reveal dir="up" distance={30} delay={60}>
@@ -1678,11 +1666,12 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
               This piece is part of an upcoming drop. Be the first to know when it lands.
             </p>
             <div style={{ display: "flex", gap: 10, overflowX: "auto", paddingBottom: 4, scrollbarWidth: "none", marginBottom: 16 }}>
-              {REVIEWS.map((r) => (
-                <div key={r.name} style={{
-                  flexShrink: 0, width: 200, borderRadius: "1rem", padding: "0.9rem 1rem",
-                  background: "rgba(200,168,130,0.07)", border: "1px solid rgba(200,168,130,0.13)",
-                }}>
+              {[
+                { name: "Jordan M.", text: "Fits true to size and the cushioning held up over a full marathon block.", stars: 5 },
+                { name: "Priya K.",  text: "Material feels premium, exactly like the photos. Shipping was fast too.",  stars: 5 },
+                { name: "Sam R.",    text: "Great quality overall, sizing ran slightly large for me.",                  stars: 4 },
+              ].map((r) => (
+                <div key={r.name} style={{ flexShrink: 0, width: 200, borderRadius: "1rem", padding: "0.9rem 1rem", background: "rgba(200,168,130,0.07)", border: "1px solid rgba(200,168,130,0.13)" }}>
                   <div style={{ display: "flex", gap: 2, marginBottom: 8 }}>
                     {Array.from({ length: 5 }).map((_, i) => (<Star key={i} size={11} fill={i < r.stars ? "#d9a02e" : "none"} stroke="#d9a02e" />))}
                   </div>
@@ -1691,28 +1680,19 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
                 </div>
               ))}
             </div>
-            <button
-              onClick={() => setNotified(true)}
-              className="w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
-              style={notified
-                ? { background: "rgba(200,168,130,0.12)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.25)" }
-                : { background: "#C8A882", color: "#1E0D06" }
-              }
-            >
+            <button onClick={() => setNotified(true)} className="w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
+              style={notified ? { background: "rgba(200,168,130,0.12)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.25)" } : { background: "#C8A882", color: "#1E0D06" }}>
               {notified ? (<><Check size={15} /> You're on the list</>) : "Notify Me When Available"}
             </button>
-            <button
-              onClick={() => toggleWish(product.id)}
-              className="mt-3 w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
-              style={{ background: "rgba(200,168,130,0.07)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.15)" }}
-            >
+            <button onClick={() => toggleWish(product.id)} className="mt-3 w-full py-3 rounded-full text-sm font-medium flex items-center justify-center gap-2 transition-all"
+              style={{ background: "rgba(200,168,130,0.07)", color: "#C8A882", border: "1px solid rgba(200,168,130,0.15)" }}>
               <Heart size={14} fill={wishlist.has(product.id) ? "#C8A882" : "none"} stroke="#C8A882" />
               {wishlist.has(product.id) ? "Saved to Wishlist" : "Save to Wishlist"}
             </button>
           </div>
         </Reveal>
 
-        {/* ── Perks — fade up ── */}
+        {/* ── Perks ── */}
         <Reveal dir="up" distance={25} delay={60}>
           <div className="grid grid-cols-3 gap-3 text-xs mb-8" style={{ color: C.inkSoft }}>
             <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><Truck size={14} /><span>Free Shipping</span></div>
@@ -1720,29 +1700,27 @@ function ProductPage({ productId, onAddToCart, wishlist, toggleWish, onOpenProdu
             <div className="flex flex-col items-center gap-1.5 text-center rounded-xl py-3" style={{ background: C.bgSoft, border: `1px solid ${C.line}` }}><ShieldCheck size={14} /><span>Secure Checkout</span></div>
           </div>
         </Reveal>
-      </div>
+        </div>
 
-      {/* ── You may also like — cards slide in from sides ── */}
-      {related.length > 0 && (
-        <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
-          <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
-            <Reveal dir="up" distance={30}>
-              <h2 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "2.25rem", margin: "0 0 2rem 0" }}>You may also like</h2>
-            </Reveal>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
-              {related.map((p, i) => {
-                const dir = i < related.length / 2 ? "left" : "right";
-                return (
-                  <Reveal key={p.id} dir={dir} distance={60} delay={i * 60}>
+        {/* ── You may also like ── */}
+        {PRODUCTS.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4).length > 0 && (
+          <section style={{ background: `linear-gradient(to bottom, ${C.bg} 0%, #2E1508 100%)` }}>
+            <div className="max-w-7xl mx-auto px-5 sm:px-8 py-12">
+              <Reveal dir="up" distance={30}>
+                <h2 style={{ color: C.ink, fontFamily: FONT_ACCENT, fontStyle: "italic", fontWeight: 400, fontSize: "2.25rem", margin: "0 0 2rem 0" }}>You may also like</h2>
+              </Reveal>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-6">
+                {PRODUCTS.filter((p) => p.category === product.category && p.id !== product.id).slice(0, 4).map((p, i) => (
+                  <Reveal key={p.id} dir={i < 2 ? "left" : "right"} distance={60} delay={i * 60}>
                     <TiltCard product={p} onOpen={onOpenProduct} isWishlisted={wishlist.has(p.id)} onToggleWish={toggleWish} darkBg />
                   </Reveal>
-                );
-              })}
+                ))}
+              </div>
             </div>
-          </div>
-        </section>
-      )}
-    </div>
+          </section>
+        )}
+      </div>
+    </>
   );
 }
 
